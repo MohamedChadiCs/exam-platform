@@ -1,0 +1,1023 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import {
+  ArrowLeft, Plus, Trash2, ArrowUp, ArrowDown, Save, Send, Settings,
+  CheckCircle2, Clock, Award, BookOpen, Library, HelpCircle, FileText, Tag, FolderPlus
+} from 'lucide-react';
+import { api } from '../lib/api';
+import Alert from '../components/Alert';
+
+function getMatchingCategoryIds(selectedId, catList) {
+  if (!selectedId) return null;
+  const ids = new Set([selectedId]);
+  let added = true;
+  while (added) {
+    added = false;
+    for (const c of catList) {
+      if (c.parent_id && ids.has(c.parent_id) && !ids.has(c.id)) {
+        ids.add(c.id);
+        added = true;
+      }
+    }
+  }
+  return ids;
+}
+
+export default function ExamPaperEditor() {
+  const { id } = useParams(); // If id exists, edit mode; otherwise, new exam
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  const [courses, setCourses] = useState([]);
+  const [bankQuestions, setBankQuestions] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [bankCategoryFilter, setBankCategoryFilter] = useState('');
+  const [inlineCatName, setInlineCatName] = useState('');
+  const [showInlineCatFor, setShowInlineCatFor] = useState(null); // question index or null
+
+  // Exam Paper State
+  const [exam, setExam] = useState({
+    courseId: '',
+    title: 'Midterm Examination',
+    descriptionMd: 'Read all questions carefully before answering. Each exercise carries the stated points.',
+    locale: 'fr',
+    opensAt: '',
+    closesAt: '',
+    durationMinutes: 60,
+    passingScore: 10,
+    maxScore: 20,
+    shuffleQuestions: true,
+    shuffleOptions: true,
+    negativeMarking: false,
+    maxAttempts: 1,
+    resultsPolicy: 'MANUAL',
+    showFeedback: false,
+    monitorFocus: true,
+    status: 'DRAFT',
+  });
+
+  // Questions on the Paper
+  const [questions, setQuestions] = useState([
+    {
+      typeCode: 'MCQ_SINGLE',
+      bodyMd: 'Which data structure operates on a Last-In, First-Out (LIFO) basis?',
+      explanationMd: 'A Stack is a LIFO data structure, whereas a Queue is FIFO.',
+      points: 5,
+      config: {},
+      options: [
+        { bodyMd: 'Queue', isCorrect: false },
+        { bodyMd: 'Stack', isCorrect: true },
+        { bodyMd: 'Array', isCorrect: false },
+        { bodyMd: 'Linked List', isCorrect: false },
+      ],
+    },
+    {
+      typeCode: 'TRUE_FALSE',
+      bodyMd: 'In relational databases, primary keys can contain NULL values.',
+      explanationMd: 'Primary keys must contain UNIQUE and NOT NULL values.',
+      points: 5,
+      config: {},
+      options: [
+        { bodyMd: 'True', isCorrect: false },
+        { bodyMd: 'False', isCorrect: true },
+      ],
+    },
+  ]);
+
+  // Load initial data
+  useEffect(() => {
+    async function init() {
+      setLoading(true);
+      setError('');
+      try {
+        const [cList, bList, catList] = await Promise.all([
+          api.get('/academic/courses'),
+          api.get('/questions').catch(() => []),
+          api.get('/questions/categories').catch(() => []),
+        ]);
+        setCourses(cList);
+        setBankQuestions(bList);
+        setCategories(catList);
+
+        if (id) {
+          // Editing existing exam
+          const ex = await api.get(`/exams/${id}`);
+          setExam({
+            ...ex,
+            opensAt: new Date(ex.opens_at).toISOString().slice(0, 16),
+            closesAt: new Date(ex.closes_at).toISOString().slice(0, 16),
+            durationMinutes: ex.duration_minutes,
+            maxScore: ex.max_score,
+            passingScore: ex.passing_score,
+            courseId: ex.course_id,
+            descriptionMd: ex.description_md ?? '',
+          });
+
+          // Set loaded questions
+          if (ex.questions && ex.questions.length > 0) {
+            setQuestions(
+              ex.questions.map((q) => ({
+                questionVersionId: q.question_version_id,
+                categoryId: q.category_id ?? '',
+                typeCode: q.type_code,
+                bodyMd: q.body_md,
+                explanationMd: q.explanation_md ?? '',
+                points: Number(q.points),
+                config: q.config ?? {},
+                options: q.options ? q.options.map((o) => ({ bodyMd: o.body_md, isCorrect: o.is_correct })) : [],
+              }))
+            );
+          }
+        } else {
+          // Default dates for new exam
+          const now = new Date();
+          const opens = new Date(now.getTime() + 10 * 60000).toISOString().slice(0, 16);
+          const closes = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 16);
+          setExam((prev) => ({
+            ...prev,
+            courseId: cList[0]?.id || '',
+            opensAt: opens,
+            closesAt: closes,
+          }));
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+  }, [id]);
+
+  // Calculate total points dynamically from questions
+  const computedTotalPoints = questions.reduce((sum, q) => sum + (parseFloat(q.points) || 0), 0);
+
+  // Question editing helpers
+  function addQuestion(type = 'MCQ_SINGLE') {
+    let defaultOptions = [];
+    if (type === 'MCQ_SINGLE' || type === 'MCQ_MULTI') {
+      defaultOptions = [
+        { bodyMd: 'Option A', isCorrect: true },
+        { bodyMd: 'Option B', isCorrect: false },
+        { bodyMd: 'Option C', isCorrect: false },
+        { bodyMd: 'Option D', isCorrect: false },
+      ];
+    } else if (type === 'TRUE_FALSE') {
+      defaultOptions = [
+        { bodyMd: 'True', isCorrect: true },
+        { bodyMd: 'False', isCorrect: false },
+      ];
+    }
+
+    const newQ = {
+      typeCode: type,
+      bodyMd: 'Type your question statement here...',
+      explanationMd: '',
+      points: 5,
+      categoryId: '',
+      config: type === 'NUMERIC' ? { answer: 10, tolerance: 0.1 } : {},
+      options: defaultOptions,
+    };
+    setQuestions([...questions, newQ]);
+  }
+
+  function updateQuestion(index, fields) {
+    const updated = [...questions];
+    updated[index] = { ...updated[index], ...fields };
+    setQuestions(updated);
+  }
+
+  function removeQuestion(index) {
+    setQuestions(questions.filter((_, i) => i !== index));
+  }
+
+  function moveQuestion(index, dir) {
+    if ((dir === -1 && index === 0) || (dir === 1 && index === questions.length - 1)) return;
+    const updated = [...questions];
+    const target = index + dir;
+    [updated[index], updated[target]] = [updated[target], updated[index]];
+    setQuestions(updated);
+  }
+
+  function handleOptionChange(qIdx, optIdx, field, val) {
+    const updated = [...questions];
+    const q = { ...updated[qIdx] };
+    const opts = [...q.options];
+
+    if (field === 'isCorrect' && q.typeCode === 'MCQ_SINGLE') {
+      opts.forEach((o, i) => { o.isCorrect = i === optIdx; });
+    } else {
+      opts[optIdx] = { ...opts[optIdx], [field]: val };
+    }
+
+    q.options = opts;
+    updated[qIdx] = q;
+    setQuestions(updated);
+  }
+
+  function addOption(qIdx) {
+    const updated = [...questions];
+    const q = { ...updated[qIdx] };
+    q.options = [...q.options, { bodyMd: `Choice ${q.options.length + 1}`, isCorrect: false }];
+    updated[qIdx] = q;
+    setQuestions(updated);
+  }
+
+  function removeOption(qIdx, optIdx) {
+    const updated = [...questions];
+    const q = { ...updated[qIdx] };
+    q.options = q.options.filter((_, i) => i !== optIdx);
+    updated[qIdx] = q;
+    setQuestions(updated);
+  }
+
+  async function importBankQuestion(bankQ) {
+    let rawOptions = bankQ.options;
+    const needsOptions = ['MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE'].includes(bankQ.type_code);
+    if (needsOptions && (!rawOptions || rawOptions.length === 0)) {
+      try {
+        const full = await api.get(`/questions/${bankQ.id}`);
+        if (full && Array.isArray(full.options)) {
+          rawOptions = full.options;
+        }
+      } catch (err) {
+        console.error('Failed to load question details:', err);
+      }
+    }
+
+    const imported = {
+      questionVersionId: bankQ.version_id,
+      categoryId: bankQ.category_id ?? '',
+      typeCode: bankQ.type_code,
+      bodyMd: bankQ.body_md,
+      explanationMd: bankQ.explanation_md ?? '',
+      points: Number(bankQ.default_points) || 5,
+      config: bankQ.config ?? {},
+      options: Array.isArray(rawOptions)
+        ? rawOptions.map((o) => ({
+            bodyMd: o.bodyMd ?? o.body_md ?? '',
+            isCorrect: o.isCorrect ?? o.is_correct ?? false,
+          }))
+        : [],
+    };
+    setQuestions([...questions, imported]);
+    setShowBankModal(false);
+  }
+
+  async function openBankModal() {
+    setShowBankModal(true);
+    try {
+      const [bList, catList] = await Promise.all([
+        api.get('/questions').catch(() => []),
+        api.get('/questions/categories').catch(() => []),
+      ]);
+      setBankQuestions(bList);
+      setCategories(catList);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Create a category on the fly from exam paper
+  async function handleInlineCatCreate(qIdx) {
+    if (!inlineCatName.trim()) return;
+    try {
+      const res = await api.post('/questions/categories', { name: inlineCatName.trim() });
+      const catList = await api.get('/questions/categories');
+      setCategories(catList);
+      updateQuestion(qIdx, { categoryId: res.id });
+      setInlineCatName('');
+      setShowInlineCatFor(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  // Save Exam & Questions
+  async function handleSave(publish = false) {
+    if (!exam.courseId) {
+      setError('Please select a course for this examination.');
+      return;
+    }
+    if (!exam.title.trim()) {
+      setError('Please provide an exam title.');
+      return;
+    }
+    if (questions.length === 0) {
+      setError('Please add at least one question to the exam paper.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    setSuccessMsg('');
+
+    const maxScore = computedTotalPoints > 0 ? computedTotalPoints : exam.maxScore;
+    const passingScore = Math.min(exam.passingScore, maxScore);
+
+    const payload = {
+      courseId: exam.courseId,
+      title: exam.title,
+      descriptionMd: exam.descriptionMd,
+      locale: exam.locale || 'fr',
+      opensAt: new Date(exam.opensAt).toISOString(),
+      closesAt: new Date(exam.closesAt).toISOString(),
+      durationMinutes: parseInt(exam.durationMinutes, 10) || 60,
+      maxScore,
+      passingScore,
+      shuffleQuestions: exam.shuffleQuestions,
+      shuffleOptions: exam.shuffleOptions,
+      negativeMarking: exam.negativeMarking,
+      maxAttempts: exam.maxAttempts,
+      resultsPolicy: exam.resultsPolicy,
+      showFeedback: exam.showFeedback,
+      monitorFocus: exam.monitorFocus,
+      questions: questions.map((q) => ({
+        questionVersionId: q.questionVersionId,
+        categoryId: q.categoryId || null,
+        typeCode: q.typeCode,
+        bodyMd: q.bodyMd,
+        explanationMd: q.explanationMd,
+        points: q.points,
+        config: q.config,
+        options: q.options,
+      })),
+    };
+
+    try {
+      let savedExamId = id;
+      if (id) {
+        await api.put(`/exams/${id}`, payload);
+      } else {
+        const res = await api.post('/exams', payload);
+        savedExamId = res.id;
+      }
+
+      if (publish) {
+        await api.post(`/exams/${savedExamId}/publish`);
+        navigate('/app/exams');
+        return;
+      }
+
+      setSuccessMsg('Exam paper saved successfully.');
+      if (!id) {
+        navigate(`/app/exams/${savedExamId}/edit`, { replace: true });
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="py-12 text-center text-sm text-ink-soft">{t('common.loading')}</div>;
+  }
+
+  const selectedCourse = courses.find((c) => c.id === exam.courseId);
+
+  return (
+    <div className="-mx-6 -my-8 min-h-screen bg-slate-100/80 pb-16 pt-4">
+      {/* Top Floating Control Bar */}
+      <div className="sticky top-0 z-30 mb-6 border-b border-line bg-white/95 px-6 py-3.5 backdrop-blur-md shadow-sm">
+        <div className="mx-auto flex max-w-5xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link to="/app/exams" className="btn-quiet text-xs py-1.5 px-2.5">
+              <ArrowLeft size={14} /> Back
+            </Link>
+            <div className="h-4 w-px bg-line" />
+            <div>
+              <span className="text-xs font-semibold text-mark">Exam Paper Creator</span>
+              <div className="text-xs text-ink-soft">
+                {questions.length} questions • Total: <span className="font-bold text-ink">{computedTotalPoints} pts</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="btn-quiet text-xs py-1.5 px-3"
+            >
+              <Settings size={14} /> Schedule & Rules
+            </button>
+
+            <button
+              disabled={saving}
+              onClick={() => handleSave(false)}
+              className="btn-quiet text-xs py-1.5 px-3 font-medium"
+            >
+              <Save size={14} /> {saving ? 'Saving…' : 'Save Draft'}
+            </button>
+
+            <button
+              disabled={saving}
+              onClick={() => handleSave(true)}
+              className="btn-primary text-xs py-1.5 px-3 font-medium shadow-sm"
+            >
+              <Send size={14} /> Publish Exam
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-4xl px-4">
+        {error && <div className="mb-4"><Alert variant="danger">{error}</Alert></div>}
+        {successMsg && <div className="mb-4"><Alert variant="ok">{successMsg}</Alert></div>}
+
+        {/* =========================================================================
+            THE EXAM PAPER SHEET (Styled like a formal academic examination paper)
+           ========================================================================= */}
+        <div className="relative rounded-sm border border-slate-300 bg-white p-8 shadow-xl transition-all sm:p-14">
+          {/* Header Seal & Academic Banner */}
+          <div className="border-b-2 border-slate-900 pb-6 text-center">
+            <div className="text-xs font-bold uppercase tracking-widest text-slate-500">
+              Department of {selectedCourse?.department_name || 'Academic Studies'}
+            </div>
+            
+            {/* Course & Title Inline Editable */}
+            <div className="mt-2 flex flex-col items-center justify-center gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase text-slate-500">Course:</span>
+                <select
+                  value={exam.courseId}
+                  onChange={(e) => setExam({ ...exam, courseId: e.target.value })}
+                  className="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-sm font-bold text-slate-800"
+                >
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <input
+                type="text"
+                value={exam.title}
+                onChange={(e) => setExam({ ...exam, title: e.target.value })}
+                placeholder="Examination Title..."
+                className="w-full text-center text-2xl font-black uppercase tracking-tight text-slate-900 hover:bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-mark rounded px-2 py-1 font-serif"
+              />
+            </div>
+
+            {/* Exam Meta Strip on Paper */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-6 border-t border-slate-200 pt-3 text-xs text-slate-600">
+              <div className="flex items-center gap-1.5">
+                <Clock size={13} className="text-slate-500" />
+                <span>Duration: <strong>{exam.durationMinutes} minutes</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Award size={13} className="text-slate-500" />
+                <span>Total Score: <strong>{computedTotalPoints} Points</strong></span>
+              </div>
+              <div>
+                <span>Pass Requirement: <strong>{exam.passingScore} Points</strong></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Instructions Box */}
+          <div className="my-6 rounded border border-slate-300 bg-slate-50/70 p-4 text-xs leading-relaxed text-slate-700">
+            <span className="font-bold uppercase tracking-wider text-slate-900">Instructions to Candidates:</span>
+            <textarea
+              rows={2}
+              value={exam.descriptionMd}
+              onChange={(e) => setExam({ ...exam, descriptionMd: e.target.value })}
+              placeholder="Instructions and exam conditions..."
+              className="mt-1 w-full rounded border-0 bg-transparent p-0 text-xs text-slate-700 focus:outline-none focus:ring-0 resize-none italic"
+            />
+          </div>
+
+          {/* =========================================================================
+              QUESTIONS LIST (Rendered directly down the exam paper)
+             ========================================================================= */}
+          <div className="divide-y divide-slate-200">
+            {questions.map((q, idx) => (
+              <div key={idx} className="group relative py-8 first:pt-4">
+                {/* Question Header & Points in Margin */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-serif text-base font-bold text-slate-900">
+                      Exercise {idx + 1}
+                    </span>
+                    <select
+                      value={q.typeCode}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        let opts = q.options;
+                        if (newType === 'TRUE_FALSE') {
+                          opts = [{ bodyMd: 'True', isCorrect: true }, { bodyMd: 'False', isCorrect: false }];
+                        } else if (newType === 'NUMERIC' || newType === 'SHORT_TEXT') {
+                          opts = [];
+                        } else if (opts.length === 0) {
+                          opts = [{ bodyMd: 'Option A', isCorrect: true }, { bodyMd: 'Option B', isCorrect: false }];
+                        }
+                        updateQuestion(idx, { typeCode: newType, options: opts });
+                      }}
+                      className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    >
+                      <option value="MCQ_SINGLE">Single Choice (MCQ)</option>
+                      <option value="MCQ_MULTI">Multiple Choice (MCQ)</option>
+                      <option value="TRUE_FALSE">True / False</option>
+                      <option value="NUMERIC">Numeric Calculation</option>
+                      <option value="SHORT_TEXT">Short Text / Open Ended</option>
+                    </select>
+                  </div>
+
+                  {/* Points Box (styled like an exam grading tag) */}
+                  <div className="flex items-center gap-1 font-mono text-xs">
+                    <span className="text-slate-400">[</span>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={q.points}
+                      onChange={(e) => updateQuestion(idx, { points: parseFloat(e.target.value) || 0 })}
+                      className="w-14 text-center font-bold text-slate-900 border-b border-dashed border-slate-400 focus:border-mark focus:outline-none"
+                    />
+                    <span className="font-medium text-slate-500">pts</span>
+                    <span className="text-slate-400">]</span>
+                  </div>
+                </div>
+
+                {/* Category Tag Row */}
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <Tag size={12} className="text-slate-400 shrink-0" />
+                  {showInlineCatFor === idx ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={inlineCatName}
+                        onChange={(e) => setInlineCatName(e.target.value)}
+                        placeholder="New category name..."
+                        className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs focus:border-mark focus:outline-none w-40"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleInlineCatCreate(idx);
+                          } else if (e.key === 'Escape') {
+                            setShowInlineCatFor(null);
+                            setInlineCatName('');
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInlineCatCreate(idx)}
+                        className="rounded bg-mark px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-mark/90"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowInlineCatFor(null); setInlineCatName(''); }}
+                        className="text-slate-400 hover:text-slate-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={q.categoryId || ''}
+                        onChange={(e) => updateQuestion(idx, { categoryId: e.target.value })}
+                        className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:border-slate-300"
+                      >
+                        <option value="">No category</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.depth > 0 ? `${'\u00A0\u00A0'.repeat(c.depth)}↳ ${c.name}` : c.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => { setShowInlineCatFor(idx); setInlineCatName(''); }}
+                        className="text-[11px] font-semibold text-mark hover:underline"
+                      >
+                        + New
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Question Prompt (Paper styled auto-expanding textarea) */}
+                <div className="mt-3">
+                  <textarea
+                    rows={2}
+                    value={q.bodyMd}
+                    onChange={(e) => updateQuestion(idx, { bodyMd: e.target.value })}
+                    placeholder="Enter the question problem statement or text here..."
+                    className="w-full rounded border border-transparent p-2 text-sm leading-relaxed text-slate-800 hover:border-slate-300 focus:border-mark focus:bg-slate-50 focus:outline-none"
+                  />
+                </div>
+
+                {/* Answers / Options Area (Styled like real exam choices) */}
+                <div className="mt-4 ps-2">
+                  {(q.typeCode === 'MCQ_SINGLE' || q.typeCode === 'MCQ_MULTI' || q.typeCode === 'TRUE_FALSE') && (
+                    <div className="space-y-2.5">
+                      {q.options.map((opt, oIdx) => (
+                        <div key={oIdx} className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            title="Click to mark as the correct answer key"
+                            onClick={() => handleOptionChange(idx, oIdx, 'isCorrect', !opt.isCorrect)}
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition-all ${
+                              opt.isCorrect
+                                ? 'border-ok bg-ok text-white shadow-sm'
+                                : 'border-slate-300 bg-white text-slate-400 hover:border-slate-500 hover:text-slate-600'
+                            }`}
+                          >
+                            {String.fromCharCode(65 + oIdx)}
+                          </button>
+
+                          <input
+                            type="text"
+                            value={opt.bodyMd}
+                            onChange={(e) => handleOptionChange(idx, oIdx, 'bodyMd', e.target.value)}
+                            placeholder={`Choice ${String.fromCharCode(65 + oIdx)}...`}
+                            className={`flex-1 rounded border px-3 py-1.5 text-xs transition-colors ${
+                              opt.isCorrect
+                                ? 'border-ok/40 bg-ok-tint/30 text-slate-900 font-medium'
+                                : 'border-slate-200 bg-white hover:border-slate-300'
+                            }`}
+                          />
+
+                          {opt.isCorrect && (
+                            <span className="text-[11px] font-semibold text-ok shrink-0">✓ Key</span>
+                          )}
+
+                          {q.typeCode !== 'TRUE_FALSE' && q.options.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => removeOption(idx, oIdx)}
+                              className="text-slate-300 hover:text-pen p-1"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {q.typeCode !== 'TRUE_FALSE' && (
+                        <button
+                          type="button"
+                          onClick={() => addOption(idx)}
+                          className="mt-2 text-xs font-semibold text-mark hover:underline ps-8"
+                        >
+                          + Add Choice
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Numeric Answer Configuration */}
+                  {q.typeCode === 'NUMERIC' && (
+                    <div className="flex flex-wrap items-center gap-4 rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-xs">
+                      <span className="font-semibold text-slate-700">Answer Key:</span>
+                      <div className="flex items-center gap-2">
+                        <span>Expected Value:</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={q.config?.answer ?? ''}
+                          onChange={(e) => updateQuestion(idx, { config: { ...q.config, answer: parseFloat(e.target.value) } })}
+                          className="input w-24 py-1 text-xs font-mono"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>Tolerance (±):</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={q.config?.tolerance ?? 0}
+                          onChange={(e) => updateQuestion(idx, { config: { ...q.config, tolerance: parseFloat(e.target.value) } })}
+                          className="input w-20 py-1 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Short Text Ruled Writing Lines (Visual Exam Paper representation) */}
+                  {q.typeCode === 'SHORT_TEXT' && (
+                    <div className="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50/50 p-3">
+                      <div className="text-[11px] italic text-slate-500">
+                        [Student will write their answer in an open response box during the exam]
+                      </div>
+                      <div className="border-b border-dashed border-slate-300 py-1"></div>
+                      <div className="border-b border-dashed border-slate-300 py-1"></div>
+                      <div className="border-b border-dashed border-slate-300 py-1"></div>
+                    </div>
+                  )}
+
+                  {/* Explanation / Solution key note */}
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      value={q.explanationMd || ''}
+                      onChange={(e) => updateQuestion(idx, { explanationMd: e.target.value })}
+                      placeholder="Optional solution notes or grading rubric (shown to students during feedback)..."
+                      className="w-full text-[11px] text-slate-500 italic border-b border-transparent hover:border-slate-300 focus:border-slate-400 focus:outline-none py-0.5"
+                    />
+                  </div>
+                </div>
+
+                {/* Question Actions Toolbar (Reorder / Delete) */}
+                <div className="mt-4 flex items-center justify-end gap-1 text-slate-400">
+                  <button
+                    type="button"
+                    title="Move Up"
+                    disabled={idx === 0}
+                    onClick={() => moveQuestion(idx, -1)}
+                    className="p-1 hover:text-slate-700 disabled:opacity-20"
+                  >
+                    <ArrowUp size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Move Down"
+                    disabled={idx === questions.length - 1}
+                    onClick={() => moveQuestion(idx, 1)}
+                    className="p-1 hover:text-slate-700 disabled:opacity-20"
+                  >
+                    <ArrowDown size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete Question"
+                    onClick={() => removeQuestion(idx)}
+                    className="p-1 hover:text-pen ms-2"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* =========================================================================
+              ADD QUESTION BAR DIRECTLY ON THE PAPER
+             ========================================================================= */}
+          <div className="mt-10 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              + Add Question to Examination Paper
+            </span>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => addQuestion('MCQ_SINGLE')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Single Choice (MCQ)
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('MCQ_MULTI')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Multiple Choice (MCQ)
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('TRUE_FALSE')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + True / False
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('NUMERIC')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Numeric Calculation
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('SHORT_TEXT')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Short Text / Essay
+              </button>
+              <button
+                type="button"
+                onClick={openBankModal}
+                className="btn-primary text-xs py-1.5 px-3 bg-mark"
+              >
+                <Library size={13} /> Import from Question Bank
+              </button>
+            </div>
+          </div>
+
+          {/* Exam Paper Bottom Footer */}
+          <div className="mt-12 border-t-2 border-slate-900 pt-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-widest">
+            — End of Examination Paper —
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          EXAM CONFIGURATION & RULES MODAL / DRAWER
+         ========================================================================= */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-lg border border-line bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-ink">Examination Schedule & Rules</h2>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-soft">Opens At</label>
+                  <input
+                    type="datetime-local"
+                    value={exam.opensAt}
+                    onChange={(e) => setExam({ ...exam, opensAt: e.target.value })}
+                    className="input text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-soft">Closes At</label>
+                  <input
+                    type="datetime-local"
+                    value={exam.closesAt}
+                    onChange={(e) => setExam({ ...exam, closesAt: e.target.value })}
+                    className="input text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-soft">Duration (Minutes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={exam.durationMinutes}
+                    onChange={(e) => setExam({ ...exam, durationMinutes: parseInt(e.target.value, 10) || 1 })}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-soft">Passing Score</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={exam.passingScore}
+                    onChange={(e) => setExam({ ...exam, passingScore: parseFloat(e.target.value) || 0 })}
+                    className="input"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded border border-line bg-paper p-3 text-xs">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={exam.shuffleQuestions}
+                    onChange={(e) => setExam({ ...exam, shuffleQuestions: e.target.checked })}
+                    className="rounded text-mark"
+                  />
+                  <span>Shuffle question order for each candidate</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={exam.shuffleOptions}
+                    onChange={(e) => setExam({ ...exam, shuffleOptions: e.target.checked })}
+                    className="rounded text-mark"
+                  />
+                  <span>Shuffle option choices order</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={exam.monitorFocus}
+                    onChange={(e) => setExam({ ...exam, monitorFocus: e.target.checked })}
+                    className="rounded text-mark"
+                  />
+                  <span>Track tab switching and window blur (Integrity protection)</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={exam.negativeMarking}
+                    onChange={(e) => setExam({ ...exam, negativeMarking: e.target.checked })}
+                    className="rounded text-mark"
+                  />
+                  <span>Apply penalty for wrong choices (Negative marking)</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSettings(false)}
+                  className="btn-primary text-xs"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          IMPORT FROM QUESTION BANK MODAL
+         ========================================================================= */}
+      {showBankModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-line bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-ink">Import from Question Bank</h2>
+            <p className="mt-1 text-xs text-ink-soft">
+              Select any existing question from your bank to insert onto this exam paper.
+            </p>
+
+            {/* Category Filter */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <Tag size={13} className="text-ink-soft" />
+              <span className="font-medium text-ink-soft">Filter by category:</span>
+              <select
+                value={bankCategoryFilter}
+                onChange={(e) => setBankCategoryFilter(e.target.value)}
+                className="rounded border border-line bg-white px-2 py-1 text-xs"
+              >
+                <option value="">All Categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.depth > 0 ? `${'\u00A0\u00A0'.repeat(c.depth)}↳ ${c.name}` : c.name}
+                  </option>
+                ))}
+              </select>
+              {bankCategoryFilter && (
+                <span className="text-[11px] text-mark font-medium">
+                  (Includes all subcategories)
+                </span>
+              )}
+            </div>
+
+            <div className="mt-4 divide-y divide-line max-h-96 overflow-y-auto">
+              {(() => {
+                const matchingCatIds = getMatchingCategoryIds(bankCategoryFilter, categories);
+                const filteredBankQuestions = bankQuestions.filter(
+                  (q) => !matchingCatIds || (q.category_id && matchingCatIds.has(q.category_id))
+                );
+
+                if (filteredBankQuestions.length === 0) {
+                  return (
+                    <div className="py-8 text-center text-xs text-ink-faint">
+                      No questions found{bankCategoryFilter ? ' in this category or its subcategories' : ' in question bank'}.
+                    </div>
+                  );
+                }
+
+                return filteredBankQuestions.map((q) => (
+                  <div key={q.id} className="flex items-start justify-between gap-4 py-3">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-ink">{q.body_md}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+                        <span className="rounded bg-paper px-1.5 py-0.5">{q.type_code}</span>
+                        <span>{q.default_points} pts</span>
+                        {Array.isArray(q.options) && q.options.length > 0 && (
+                          <span className="text-ok font-medium">• {q.options.length} options</span>
+                        )}
+                        {(q.category_path || q.category_name) && (
+                          <span className="flex items-center gap-1 text-slate-500">
+                            • <Tag size={11} /> {q.category_path || q.category_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => importBankQuestion(q)}
+                      className="btn-primary text-xs py-1 px-2.5"
+                    >
+                      Insert
+                    </button>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-line">
+              <button
+                type="button"
+                onClick={() => { setShowBankModal(false); setBankCategoryFilter(''); }}
+                className="btn-quiet text-xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
