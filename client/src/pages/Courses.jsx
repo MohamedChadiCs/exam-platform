@@ -245,7 +245,7 @@ export default function Courses() {
               onClick={() => setStatusFilter(tab.id)}
               className={`rounded-md px-3 py-1 font-medium transition ${
                 statusFilter === tab.id
-                  ? 'bg-white text-mark shadow-2xs'
+                  ? 'bg-white text-mark shadow-sm'
                   : 'text-ink-soft hover:text-ink'
               }`}
             >

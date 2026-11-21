@@ -1,14 +1,20 @@
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
-export default function Alert({ kind = 'error', children }) {
+export default function Alert({ kind, variant, children }) {
   if (!children) return null;
-  const ok = kind === 'ok';
-  const Icon = ok ? CheckCircle2 : AlertCircle;
+  const isOk = kind === 'ok' || variant === 'ok';
+  const Icon = isOk ? CheckCircle2 : AlertCircle;
   return (
-    <div role={ok ? 'status' : 'alert'}
-      className={`flex gap-2 rounded-md px-3 py-2.5 text-sm ${ok ? 'bg-ok-tint text-ok' : 'bg-pen-tint text-pen'}`}>
+    <div
+      role={isOk ? 'status' : 'alert'}
+      className={`flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-sm shadow-sm transition-all ${
+        isOk
+          ? 'border-ok/20 bg-ok-tint text-ok'
+          : 'border-pen/20 bg-pen-tint text-pen'
+      }`}
+    >
       <Icon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-      <div>{children}</div>
+      <div className="font-medium leading-relaxed">{children}</div>
     </div>
   );
 }

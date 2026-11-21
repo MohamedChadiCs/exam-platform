@@ -308,7 +308,7 @@ export default function TeacherClasses() {
               onClick={() => setStatusFilter(tab.id)}
               className={`rounded-md px-3 py-1 font-medium transition ${
                 statusFilter === tab.id
-                  ? 'bg-white text-mark shadow-2xs'
+                  ? 'bg-white text-mark shadow-sm'
                   : 'text-ink-soft hover:text-ink'
               }`}
             >
@@ -412,7 +412,7 @@ export default function TeacherClasses() {
                       e.stopPropagation();
                       copyCode(cls.invite_code);
                     }}
-                    className="flex items-center gap-1 rounded bg-white px-2 py-1 text-xs font-medium text-mark shadow-2xs hover:bg-slate-50 border border-line"
+                    className="flex items-center gap-1 rounded bg-white px-2 py-1 text-xs font-medium text-mark shadow-sm hover:bg-slate-50 border border-line"
                     title="Copy Invite Code"
                   >
                     {copiedCode === cls.invite_code ? <Check size={13} className="text-ok" /> : <Copy size={13} />}

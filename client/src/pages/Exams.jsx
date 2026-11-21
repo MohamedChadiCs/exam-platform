@@ -267,7 +267,7 @@ export default function Exams() {
       {error && <div className="mt-4"><Alert variant="danger">{error}</Alert></div>}
 
       {/* Filters Toolbar */}
-      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-line bg-white p-4 shadow-2xs">
+      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-line bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-3 text-ink-soft" />
@@ -322,7 +322,7 @@ export default function Exams() {
                 onClick={() => setStatusFilter(tab.id)}
                 className={`rounded-md px-3 py-1 text-xs font-medium transition ${
                   statusFilter === tab.id
-                    ? 'bg-mark text-white shadow-2xs'
+                    ? 'bg-mark text-white shadow-sm'
                     : 'bg-paper text-ink-soft hover:text-ink hover:bg-slate-100'
                 }`}
               >

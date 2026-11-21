@@ -4,14 +4,14 @@ export default function Field({ label, hint, error, children, optionalLabel }) {
   const id = useId();
   const control = children(id, Boolean(error));
   return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 flex items-baseline justify-between text-sm font-medium">
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="flex items-baseline justify-between text-xs font-semibold tracking-wide text-ink">
         <span>{label}</span>
-        {optionalLabel && <span className="text-xs font-normal text-ink-faint">{optionalLabel}</span>}
+        {optionalLabel && <span className="text-[11px] font-normal text-ink-faint">{optionalLabel}</span>}
       </label>
       {control}
-      {hint && !error && <p className="mt-1 text-xs text-ink-soft">{hint}</p>}
-      {error && <p role="alert" className="mt-1 text-xs text-pen">{error}</p>}
+      {hint && !error && <p className="text-xs text-ink-soft leading-normal">{hint}</p>}
+      {error && <p role="alert" className="text-xs font-medium text-pen leading-normal">{error}</p>}
     </div>
   );
 }
