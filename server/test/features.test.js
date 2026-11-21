@@ -346,6 +346,37 @@ test('Teacher Class & Course Management: Create class, invite students, create c
     assert.equal(studentClasses.body.data[0].id, cls.id);
     assert.equal(studentClasses.body.data[0].courses.length, 1);
     assert.equal(studentClasses.body.data[0].courses[0].code, 'SE301');
+
+    // 7. Archive & Restore class, then filter by status
+    const archiveClassRes = await cProf.post(`/academic/classes/${cls.id}/archive`);
+    assert.equal(archiveClassRes.status, 200);
+
+    const activeClasses = await cProf.get('/academic/classes?mine=true&status=active');
+    assert.equal(activeClasses.body.data.length, 0);
+
+    const archivedClasses = await cProf.get('/academic/classes?mine=true&status=archived');
+    assert.equal(archivedClasses.body.data.length, 1);
+    assert.equal(archivedClasses.body.data[0].id, cls.id);
+
+    const restoreClassRes = await cProf.post(`/academic/classes/${cls.id}/restore`);
+    assert.equal(restoreClassRes.status, 200);
+    const restoredActive = await cProf.get('/academic/classes?mine=true&status=active');
+    assert.equal(restoredActive.body.data.length, 1);
+
+    // 8. Deactivate & Activate course, then filter by status
+    const deactCourseRes = await cProf.post(`/academic/courses/${course.id}/deactivate`);
+    assert.equal(deactCourseRes.status, 200);
+
+    const activeCourses = await cProf.get('/academic/courses?status=active');
+    assert.equal(activeCourses.body.data.filter((c) => c.id === course.id).length, 0);
+
+    const inactiveCourses = await cProf.get('/academic/courses?status=inactive');
+    assert.equal(inactiveCourses.body.data.filter((c) => c.id === course.id).length, 1);
+
+    const actCourseRes = await cProf.post(`/academic/courses/${course.id}/activate`);
+    assert.equal(actCourseRes.status, 200);
+    const restoredCourse = await cProf.get('/academic/courses?status=active');
+    assert.equal(restoredCourse.body.data.filter((c) => c.id === course.id).length, 1);
   } finally {
     await app.close();
   }

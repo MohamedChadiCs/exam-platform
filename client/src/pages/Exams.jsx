@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Plus, QrCode, BookOpen, Clock, Users, CheckCircle, FileText, Share2, Play, Lock, Edit3 } from 'lucide-react';
+import { Plus, QrCode, BookOpen, Clock, Users, CheckCircle, FileText, Share2, Play, Lock, Edit3, Search, X } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
 
@@ -11,6 +11,11 @@ export default function Exams() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Filters state
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [courseFilter, setCourseFilter] = useState('');
 
   // Exam creation modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -219,6 +224,19 @@ export default function Exams() {
     }
   }
 
+  const filteredExams = exams.filter((ex) => {
+    if (statusFilter !== 'ALL' && ex.status !== statusFilter) return false;
+    if (courseFilter && ex.course_id !== courseFilter) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const matchTitle = ex.title?.toLowerCase().includes(q);
+      const matchCourseCode = ex.course_code?.toLowerCase().includes(q);
+      const matchCourseName = ex.course_name?.toLowerCase().includes(q);
+      if (!matchTitle && !matchCourseCode && !matchCourseName) return false;
+    }
+    return true;
+  });
+
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -234,17 +252,108 @@ export default function Exams() {
 
       {error && <div className="mt-4"><Alert variant="danger">{error}</Alert></div>}
 
+      {/* Filters Toolbar */}
+      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-line bg-white p-4 shadow-2xs">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-3 text-ink-soft" />
+            <input
+              type="text"
+              placeholder={t('exams.searchPlaceholder', 'Search exams by title, course code or name...')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input w-full pl-9 pr-9 text-sm"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-3 text-ink-soft hover:text-ink"
+                title={t('common.clear', 'Clear')}
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          {courses.length > 0 && (
+            <select
+              value={courseFilter}
+              onChange={(e) => setCourseFilter(e.target.value)}
+              className="input text-sm sm:w-56"
+            >
+              <option value="">{t('exams.allCourses', 'All Courses')}</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} - {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Status Tabs and Result Counter */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-line/60">
+          <div className="flex flex-wrap items-center gap-1">
+            {[
+              { id: 'ALL', label: t('exams.statusAll', 'All Statuses') },
+              { id: 'DRAFT', label: t('exams.statusDraft', 'Draft') },
+              { id: 'PUBLISHED', label: t('exams.statusPublished', 'Published') },
+              { id: 'CLOSED', label: t('exams.statusClosed', 'Closed') },
+              { id: 'ARCHIVED', label: t('exams.statusArchived', 'Archived') },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusFilter(tab.id)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  statusFilter === tab.id
+                    ? 'bg-mark text-white shadow-2xs'
+                    : 'bg-paper text-ink-soft hover:text-ink hover:bg-slate-100'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-ink-soft">
+            <span>
+              {t('exams.showingCount', 'Showing {{count}} of {{total}} exams', {
+                count: filteredExams.length,
+                total: exams.length,
+              })}
+            </span>
+            {(search || courseFilter || statusFilter !== 'ALL') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setCourseFilter('');
+                  setStatusFilter('ALL');
+                }}
+                className="text-mark hover:underline font-medium"
+              >
+                {t('common.clear', 'Clear filters')}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Exams list */}
-      <div className="mt-6">
+      <div className="mt-4">
         {loading ? (
           <div className="py-8 text-center text-sm text-ink-soft">{t('common.loading')}</div>
-        ) : exams.length === 0 ? (
+        ) : filteredExams.length === 0 ? (
           <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-ink-soft">
-            {t('exams.empty', 'No exams created yet. Click "New Exam" to get started.')}
+            {exams.length === 0
+              ? t('exams.empty', 'No exams created yet. Click "New Exam" to get started.')
+              : t('exams.noMatching', 'No exams match your selected filters.')}
           </div>
         ) : (
           <div className="space-y-4">
-            {exams.map((ex) => (
+            {filteredExams.map((ex) => (
               <div key={ex.id} className="rounded-lg border border-line bg-white p-5 shadow-sm">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                   <div>

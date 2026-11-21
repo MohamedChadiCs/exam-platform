@@ -76,16 +76,19 @@ academicRouter.delete('/departments/:id', ...adminOnly, async (req, res) => {
 // ==========================================
 
 academicRouter.get('/classes', async (req, res) => {
-  const { departmentId, mine } = z.object({
+  const { departmentId, mine, status } = z.object({
     departmentId: z.string().uuid().optional(),
     mine: z.enum(['true', 'false']).optional(),
+    status: z.enum(['active', 'archived', 'all']).optional(),
   }).parse(req.query);
 
   const ownerFilter = (mine === 'true' && req.auth?.user?.id) ? req.auth.user.id : null;
+  const statusFilter = status || 'active';
 
   const { rows } = await query(
     `SELECT ac.id, ac.department_id, ac.name, ac.academic_year, ac.teacher_id, ac.teacher_id AS owner_id,
-            ac.invite_code, ac.created_at,
+            ac.invite_code, ac.created_at, ac.archived_at,
+            (ac.archived_at IS NOT NULL) AS is_archived,
             d.name AS department_name,
             u.first_name || ' ' || u.last_name AS owner_name,
             u.first_name || ' ' || u.last_name AS teacher_name,
@@ -94,11 +97,15 @@ academicRouter.get('/classes', async (req, res) => {
        FROM academic_classes ac
        LEFT JOIN departments d ON d.id = ac.department_id
        LEFT JOIN users u ON u.id = ac.teacher_id
-      WHERE ac.archived_at IS NULL
-        AND ($1::uuid IS NULL OR ac.department_id = $1)
+      WHERE ($1::uuid IS NULL OR ac.department_id = $1)
         AND ($2::uuid IS NULL OR ac.teacher_id = $2)
+        AND (
+          ($3 = 'all') OR
+          ($3 = 'archived' AND ac.archived_at IS NOT NULL) OR
+          ($3 = 'active' AND ac.archived_at IS NULL)
+        )
       ORDER BY ac.academic_year DESC, ac.name`,
-    [departmentId ?? null, ownerFilter]
+    [departmentId ?? null, ownerFilter, statusFilter]
   );
   res.json({ success: true, data: rows });
 });
@@ -219,6 +226,30 @@ academicRouter.delete('/classes/:id', ...professorOrAdmin, async (req, res) => {
   if (!rowCount) throw AppError.notFound('Class not found or unauthorized');
   await audit({ actorId: req.auth.user.id, action: 'CLASS_ARCHIVED', entityType: 'academic_class', entityId: id, ip: req.ip });
   res.json({ success: true, data: { id, archived: true } });
+});
+
+academicRouter.post('/classes/:id/archive', ...professorOrAdmin, async (req, res) => {
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  const { rowCount } = await query(
+    `UPDATE academic_classes SET archived_at = now()
+      WHERE id = $1 AND ($2 = 'ADMIN' OR teacher_id = $3) AND archived_at IS NULL`,
+    [id, req.auth.user.role, req.auth.user.id]
+  );
+  if (!rowCount) throw AppError.notFound('Class not found or already archived');
+  await audit({ actorId: req.auth.user.id, action: 'CLASS_ARCHIVED', entityType: 'academic_class', entityId: id, ip: req.ip });
+  res.json({ success: true, data: { id, archived: true } });
+});
+
+academicRouter.post('/classes/:id/restore', ...professorOrAdmin, async (req, res) => {
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  const { rowCount } = await query(
+    `UPDATE academic_classes SET archived_at = NULL
+      WHERE id = $1 AND ($2 = 'ADMIN' OR teacher_id = $3) AND archived_at IS NOT NULL`,
+    [id, req.auth.user.role, req.auth.user.id]
+  );
+  if (!rowCount) throw AppError.notFound('Class not found or not archived');
+  await audit({ actorId: req.auth.user.id, action: 'CLASS_RESTORED', entityType: 'academic_class', entityId: id, ip: req.ip });
+  res.json({ success: true, data: { id, restored: true } });
 });
 
 // Invite / Add Student to Class (by Email or Matricule)
@@ -399,15 +430,19 @@ academicRouter.get('/student/classes', ...studentOnly, async (req, res) => {
 // ==========================================
 
 academicRouter.get('/courses', async (req, res) => {
-  const { departmentId, mine } = z.object({
+  const { departmentId, mine, status } = z.object({
     departmentId: z.string().uuid().optional(),
     mine: z.enum(['true', 'false']).optional(),
+    status: z.enum(['active', 'inactive', 'all']).optional(),
   }).parse(req.query);
 
   const ownerFilter = (mine === 'true' && req.auth?.user?.id) ? req.auth.user.id : null;
+  const statusFilter = status || 'all';
 
   const { rows } = await query(
-    `SELECT c.id, c.department_id, c.code, c.name, c.teacher_id, c.teacher_id AS owner_id, d.name AS department_name,
+    `SELECT c.id, c.department_id, c.code, c.name, c.teacher_id, c.teacher_id AS owner_id,
+            c.archived_at, (c.archived_at IS NULL) AS is_active,
+            d.name AS department_name,
             u.first_name || ' ' || u.last_name AS professor_name,
             COALESCE(
               (SELECT json_agg(json_build_object('id', ac.id, 'name', ac.name, 'academic_year', ac.academic_year))
@@ -419,11 +454,15 @@ academicRouter.get('/courses', async (req, res) => {
        FROM courses c
        LEFT JOIN departments d ON d.id = c.department_id
        LEFT JOIN users u ON u.id = c.teacher_id
-      WHERE c.archived_at IS NULL
-        AND ($1::uuid IS NULL OR c.department_id = $1)
+      WHERE ($1::uuid IS NULL OR c.department_id = $1)
         AND ($2::uuid IS NULL OR c.teacher_id = $2 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = c.id AND professor_id = $2))
+        AND (
+          ($3::text = 'all') OR
+          ($3 = 'inactive' AND c.archived_at IS NOT NULL) OR
+          ($3 = 'active' AND c.archived_at IS NULL)
+        )
       ORDER BY c.code, c.name`,
-    [departmentId ?? null, ownerFilter]
+    [departmentId ?? null, ownerFilter, statusFilter]
   );
   res.json({ success: true, data: rows });
 });
@@ -546,4 +585,28 @@ academicRouter.delete('/courses/:id', ...professorOrAdmin, async (req, res) => {
   if (!rowCount) throw AppError.notFound('Course not found or unauthorized');
   await audit({ actorId: req.auth.user.id, action: 'COURSE_ARCHIVED', entityType: 'course', entityId: id, ip: req.ip });
   res.json({ success: true, data: { id, archived: true } });
+});
+
+academicRouter.post('/courses/:id/activate', ...professorOrAdmin, async (req, res) => {
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  const { rowCount } = await query(
+    `UPDATE courses SET archived_at = NULL
+      WHERE id = $1 AND ($2 = 'ADMIN' OR teacher_id = $3 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = $1 AND professor_id = $3))`,
+    [id, req.auth.user.role, req.auth.user.id]
+  );
+  if (!rowCount) throw AppError.notFound('Course not found or unauthorized');
+  await audit({ actorId: req.auth.user.id, action: 'COURSE_ACTIVATED', entityType: 'course', entityId: id, ip: req.ip });
+  res.json({ success: true, data: { id, activated: true, is_active: true } });
+});
+
+academicRouter.post('/courses/:id/deactivate', ...professorOrAdmin, async (req, res) => {
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  const { rowCount } = await query(
+    `UPDATE courses SET archived_at = now()
+      WHERE id = $1 AND ($2 = 'ADMIN' OR teacher_id = $3 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = $1 AND professor_id = $3))`,
+    [id, req.auth.user.role, req.auth.user.id]
+  );
+  if (!rowCount) throw AppError.notFound('Course not found or unauthorized');
+  await audit({ actorId: req.auth.user.id, action: 'COURSE_DEACTIVATED', entityType: 'course', entityId: id, ip: req.ip });
+  res.json({ success: true, data: { id, deactivated: true, is_active: false } });
 });

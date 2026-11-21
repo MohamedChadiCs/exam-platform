@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Users, Plus, Trash2, Edit3, Copy, Check, Mail, UserPlus, BookOpen,
-  GraduationCap, Share2, X, ChevronRight, AlertCircle
+  GraduationCap, Share2, X, ChevronRight, AlertCircle, Archive, RotateCcw, Search
 } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
@@ -43,13 +43,17 @@ export default function TeacherClasses() {
   // Copied code feedback
   const [copiedCode, setCopiedCode] = useState('');
 
+  // Status and search filter
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'archived'
+  const [search, setSearch] = useState('');
+
   async function loadData() {
     setLoading(true);
     setError('');
     try {
       const [clsList, cList, dList] = await Promise.all([
-        api.get('/academic/classes?mine=true'),
-        api.get('/academic/courses'),
+        api.get('/academic/classes?mine=true&status=all'),
+        api.get('/academic/courses?status=all'),
         api.get('/academic/departments'),
       ]);
       setClasses(clsList);
@@ -126,11 +130,27 @@ export default function TeacherClasses() {
     if (!confirm(t('classes.deleteConfirm', 'Archive this class? Students will no longer see it.'))) return;
     try {
       await api.delete(`/academic/classes/${cls.id}`);
+      setSuccessMsg(t('classes.archivedSuccess', 'Class archived successfully.'));
       if (selectedClass?.id === cls.id) {
         setSelectedClass(null);
         setClassDetails(null);
       }
       loadData();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleRestoreClass(cls, e) {
+    e.stopPropagation();
+    if (!confirm(t('classes.restoreConfirm', 'Restore this archived class?'))) return;
+    try {
+      await api.post(`/academic/classes/${cls.id}/restore`);
+      setSuccessMsg(t('classes.restoredSuccess', 'Class restored successfully.'));
+      loadData();
+      if (selectedClass?.id === cls.id) {
+        openClassDetails({ ...cls, is_archived: false, archived_at: null });
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -203,6 +223,21 @@ export default function TeacherClasses() {
     setTimeout(() => setCopiedCode(''), 2000);
   }
 
+  const filteredClasses = classes.filter((cls) => {
+    const isArchived = Boolean(cls.archived_at || cls.is_archived);
+    if (statusFilter === 'active' && isArchived) return false;
+    if (statusFilter === 'archived' && !isArchived) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const matchName = cls.name?.toLowerCase().includes(q);
+      const matchCode = cls.invite_code?.toLowerCase().includes(q);
+      const matchYear = cls.academic_year?.toLowerCase().includes(q);
+      const matchDept = cls.department_name?.toLowerCase().includes(q);
+      if (!matchName && !matchCode && !matchYear && !matchDept) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -224,34 +259,82 @@ export default function TeacherClasses() {
       {error && <Alert variant="danger">{error}</Alert>}
       {successMsg && <Alert variant="ok">{successMsg}</Alert>}
 
+      {/* Search and Status Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search size={16} className="absolute left-3 top-3 text-ink-soft" />
+          <input
+            type="text"
+            placeholder={t('classes.searchPlaceholder', 'Search classes by name, code or year...')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input w-full pl-9 text-sm"
+          />
+        </div>
+        <div className="flex items-center gap-1.5 rounded-lg border border-line bg-paper p-1 text-xs">
+          {[
+            { id: 'all', label: t('classes.all', 'All') },
+            { id: 'active', label: t('classes.active', 'Active') },
+            { id: 'archived', label: t('classes.archived', 'Archived') },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id)}
+              className={`rounded-md px-3 py-1 font-medium transition ${
+                statusFilter === tab.id
+                  ? 'bg-white text-mark shadow-2xs'
+                  : 'text-ink-soft hover:text-ink'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Classes Grid */}
       {loading ? (
         <div className="py-12 text-center text-sm text-ink-soft">{t('common.loading')}</div>
-      ) : classes.length === 0 ? (
+      ) : filteredClasses.length === 0 ? (
         <div className="rounded-lg border border-line bg-white p-12 text-center">
           <GraduationCap size={40} className="mx-auto text-ink-faint" />
-          <h3 className="mt-3 text-base font-semibold text-ink">{t('classes.emptyTitle', 'No classes created yet')}</h3>
+          <h3 className="mt-3 text-base font-semibold text-ink">
+            {classes.length === 0
+              ? t('classes.emptyTitle', 'No classes created yet')
+              : t('classes.noMatching', 'No classes match your filter')}
+          </h3>
           <p className="mt-1 text-sm text-ink-soft">
-            {t('classes.emptySubtitle', 'Click "Create Class" to create your first class and invite students.')}
+            {classes.length === 0
+              ? t('classes.emptySubtitle', 'Click "Create Class" to create your first class and invite students.')
+              : t('classes.noMatchingSubtitle', 'Try selecting a different status filter or clearing your search.')}
           </p>
-          <button onClick={handleOpenCreate} className="btn-primary mt-4 mx-auto">
-            <Plus size={16} />
-            {t('classes.newClass', 'Create Class')}
-          </button>
+          {classes.length === 0 && (
+            <button onClick={handleOpenCreate} className="btn-primary mt-4 mx-auto">
+              <Plus size={16} />
+              {t('classes.newClass', 'Create Class')}
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {classes.map((cls) => (
+          {filteredClasses.map((cls) => (
             <div
               key={cls.id}
               onClick={() => openClassDetails(cls)}
               className={`cursor-pointer rounded-lg border bg-white p-5 shadow-sm transition-all hover:border-mark hover:shadow-md ${
                 selectedClass?.id === cls.id ? 'border-mark ring-1 ring-mark' : 'border-line'
-              }`}
+              } ${cls.is_archived || cls.archived_at ? 'opacity-85 bg-slate-50/50' : ''}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="font-bold text-ink hover:text-mark">{cls.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-ink hover:text-mark">{cls.name}</h3>
+                    {(cls.is_archived || cls.archived_at) && (
+                      <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        {t('classes.archivedBadge', 'Archived')}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-ink-soft">{cls.academic_year}</div>
                   {cls.department_name && (
                     <div className="mt-1 inline-block rounded bg-paper px-2 py-0.5 text-[11px] font-medium text-ink-soft">
@@ -264,18 +347,29 @@ export default function TeacherClasses() {
                     type="button"
                     onClick={(e) => handleOpenEdit(cls, e)}
                     className="p-1 text-ink-soft hover:text-mark"
-                    title="Edit Class"
+                    title={t('classes.editClass', 'Edit Class')}
                   >
                     <Edit3 size={15} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeleteClass(cls, e)}
-                    className="p-1 text-ink-soft hover:text-pen"
-                    title="Archive Class"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {cls.is_archived || cls.archived_at ? (
+                    <button
+                      type="button"
+                      onClick={(e) => handleRestoreClass(cls, e)}
+                      className="p-1 text-ink-soft hover:text-ok"
+                      title={t('classes.restore', 'Restore Class')}
+                    >
+                      <RotateCcw size={15} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteClass(cls, e)}
+                      className="p-1 text-ink-soft hover:text-pen"
+                      title={t('classes.archive', 'Archive Class')}
+                    >
+                      <Archive size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
 

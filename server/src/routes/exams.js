@@ -106,9 +106,10 @@ async function syncExamQuestions(db, examId, professorId, questions) {
 // ==========================================
 
 examsRouter.get('/', async (req, res) => {
-  const { status, courseId } = z.object({
-    status: z.enum(['DRAFT', 'PUBLISHED', 'CANCELLED', 'CLOSED', 'ARCHIVED']).optional(),
+  const { status, courseId, search } = z.object({
+    status: z.enum(['ALL', 'DRAFT', 'PUBLISHED', 'CANCELLED', 'CLOSED', 'ARCHIVED']).optional(),
     courseId: z.string().uuid().optional(),
+    search: z.string().trim().optional(),
   }).parse(req.query);
 
   const { rows } = await query(
@@ -118,11 +119,16 @@ examsRouter.get('/', async (req, res) => {
             (SELECT count(*)::int FROM exam_sessions s JOIN exam_enrollments en ON en.id = s.enrollment_id WHERE en.exam_id = e.id) AS session_count
        FROM exams e
        JOIN courses c ON c.id = e.course_id
-      WHERE e.owner_id = $1 AND e.status != 'ARCHIVED'
-        AND ($2::text IS NULL OR e.status = $2)
+      WHERE (e.owner_id = $1 OR $5 = 'ADMIN')
+        AND (
+          ($2::text = 'ALL') OR
+          ($2::text IS NOT NULL AND e.status = $2) OR
+          ($2::text IS NULL AND e.status != 'ARCHIVED')
+        )
         AND ($3::uuid IS NULL OR e.course_id = $3)
+        AND ($4::text IS NULL OR e.title ILIKE '%' || $4 || '%' OR c.name ILIKE '%' || $4 || '%' OR c.code ILIKE '%' || $4 || '%')
       ORDER BY e.created_at DESC`,
-    [req.auth.user.id, status ?? null, courseId ?? null]
+    [req.auth.user.id, status ?? null, courseId ?? null, search ?? null, req.auth.user.role]
   );
 
   res.json({ success: true, data: rows });

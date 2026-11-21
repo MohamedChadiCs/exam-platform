@@ -3,7 +3,7 @@
   "common": { "email": "البريد الإلكتروني", "password": "كلمة المرور", "firstName": "الاسم الأول", "lastName": "الاسم العائلي",
     "loading": "جار التحميل…", "cancel": "إلغاء", "confirm": "تأكيد", "all": "الكل", "search": "بحث",
     "logout": "تسجيل الخروج", "language": "اللغة", "back": "العودة لتسجيل الدخول", "optional": "اختياري", "none": "لا يوجد", "actions": "إجراءات",
-    "create": "إنشاء", "update": "تحديث" },
+    "create": "إنشاء", "update": "تحديث", "clear": "مسح التصفية" },
   "roles": { "ADMIN": "مسؤول", "PROFESSOR": "أستاذ", "STUDENT": "طالب" },
   "status": { "PENDING_EMAIL": "بانتظار التحقق", "ACTIVE": "نشط", "SUSPENDED": "معلق", "ARCHIVED": "مؤرشف" },
   "login": { "title": "تسجيل الدخول", "subtitle": "استخدم الحساب الذي قمت بالتسجيل به.", "submit": "دخول",
@@ -51,7 +51,10 @@
     "createTitle": "إنشاء امتحان", "course": "المقرر", "name": "عنوان الامتحان", "opensAt": "تاريخ البدء", "closesAt": "تاريخ الانتهاء",
     "duration": "المدة (بالدقائق)", "maxScore": "الدرجة القصوى", "passingScore": "درجة النجاح",
     "shuffleQuestions": "خلط ترتيب الأسئلة لكل طالب", "shuffleOptions": "خلط ترتيب خيارات الإجابة",
-    "monitorFocus": "تتبع تبديل النوافذ (مراقبة النزاهة)", "selectQuestions": "تعيين الأسئلة" },
+    "monitorFocus": "تتبع تبديل النوافذ (مراقبة النزاهة)", "selectQuestions": "تعيين الأسئلة",
+    "searchPlaceholder": "البحث في الامتحانات بالعنوان أو رمز أو اسم المقرر...", "allCourses": "جميع المقررات", "statusAll": "جميع الحالات",
+    "statusDraft": "مسودة", "statusPublished": "منشور", "statusClosed": "مغلق", "statusArchived": "مؤرشف",
+    "showingCount": "عرض {{count}} من {{total}} امتحان", "noMatching": "لا توجد امتحانات مطابقة للتصفية المختارة." },
   "submissions": { "publishAll": "نشر النتائج للطلاب", "publishConfirm": "نشر النتائج لجميع طلاب هذا الامتحان؟" },
   "join": { "title": "الانضمام لامتحان", "subtitle": "أدخل رمز الوصول المكون من 8 أحرف والمقدم من أستاذ المادة.",
     "codeLabel": "رمز الوصول (8 أحرف)", "submit": "التسجيل في الامتحان" },
@@ -75,7 +78,12 @@
     "inviteModalHint": "أدخل البريد الإلكتروني أو رقم القيد للطالب لتسجيله مباشرة.",
     "studentIdentifier": "البريد الإلكتروني أو رقم القيد", "deleteConfirm": "أرشفة هذا الفصل؟ لن يتمكن الطلاب من رؤيته بعد ذلك.",
     "removeStudentConfirm": "إزالة هذا الطالب من الفصل؟", "unassignCourseConfirm": "إلغاء تعيين هذا المقرر من الفصل؟",
-    "created": "تم إنشاء الفصل! رمز الدعوة: ", "updated": "تم تحديث الفصل بنجاح"
+    "created": "تم إنشاء الفصل! رمز الدعوة: ", "updated": "تم تحديث الفصل بنجاح",
+    "searchPlaceholder": "البحث في الفصول بالاسم، الرمز أو السنة...", "all": "الكل", "active": "نشطة", "archived": "مؤرشفة",
+    "archivedBadge": "مؤرشف", "archive": "أرشفة", "restore": "استعادة",
+    "archivedSuccess": "تمت أرشفة الفصل بنجاح.", "restoredSuccess": "تمت استعادة الفصل بنجاح.",
+    "restoreConfirm": "هل ترغب في استعادة هذا الفصل المؤرشف؟", "noMatching": "لا توجد فصول مطابقة للتصفية",
+    "noMatchingSubtitle": "جرّب تغيير تصفية الحالة أو مسح البحث."
   },
   "courses": {
     "title": "المقررات الدراسية", "subtitle": "إنشاء المقررات وتعيينها للفصول الدراسية.",
@@ -88,7 +96,12 @@
     "noAvailableClasses": "لا توجد فصول دراسية متاحة بعد.", "manageAssignments": "إدارة الفصول",
     "modalHint": "حدد رمز المقرر، اسمه، واختر الفصول المرتبطة.",
     "created": "تم إنشاء المقرر بنجاح", "updated": "تم تحديث المقرر بنجاح",
-    "archiveConfirm": "أرشفة هذا المقرر؟"
+    "archiveConfirm": "أرشفة هذا المقرر؟",
+    "all": "الكل", "active": "نشط", "inactive": "غير نشط",
+    "activeBadge": "نشط", "inactiveBadge": "غير نشط",
+    "activate": "تفعيل", "deactivate": "تعطيل",
+    "activateConfirm": "هل ترغب في تفعيل هذا المقرر؟", "deactivateConfirm": "تعطيل هذا المقرر؟ سيتم تعيينه كغير نشط.",
+    "activatedSuccess": "تم تفعيل المقرر بنجاح.", "deactivatedSuccess": "تم تعطيل المقرر بنجاح."
   },
   "errors": {
     "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "EMAIL_NOT_VERIFIED": "يرجى التحقق من بريدك أولاً.",

@@ -3,7 +3,7 @@
   "common": { "email": "E-mail", "password": "Mot de passe", "firstName": "Prénom", "lastName": "Nom",
     "loading": "Chargement…", "cancel": "Annuler", "confirm": "Confirmer", "all": "Tous", "search": "Rechercher",
     "logout": "Déconnexion", "language": "Langue", "back": "Retour à la connexion", "optional": "facultatif", "none": "Aucun", "actions": "Actions",
-    "create": "Créer", "update": "Mettre à jour" },
+    "create": "Créer", "update": "Mettre à jour", "clear": "Effacer" },
   "roles": { "ADMIN": "Administrateur", "PROFESSOR": "Professeur", "STUDENT": "Étudiant" },
   "status": { "PENDING_EMAIL": "E-mail en attente", "ACTIVE": "Actif", "SUSPENDED": "Suspendu", "ARCHIVED": "Archivé" },
   "login": { "title": "Connexion", "subtitle": "Utilisez le compte avec lequel vous vous êtes inscrit.", "submit": "Se connecter",
@@ -51,7 +51,10 @@
     "createTitle": "Créer un examen", "course": "Cours", "name": "Titre de l'examen", "opensAt": "Ouverture", "closesAt": "Fermeture",
     "duration": "Durée (min)", "maxScore": "Note maximale", "passingScore": "Note de passage",
     "shuffleQuestions": "Mélanger l'ordre des questions", "shuffleOptions": "Mélanger l'ordre des options",
-    "monitorFocus": "Surveiller les changements d'onglet (Intégrité)", "selectQuestions": "Assigner des questions" },
+    "monitorFocus": "Surveiller les changements d'onglet (Intégrité)", "selectQuestions": "Assigner des questions",
+    "searchPlaceholder": "Rechercher par titre, code ou nom de cours...", "allCourses": "Tous les cours", "statusAll": "Tous les statuts",
+    "statusDraft": "Brouillon", "statusPublished": "Publié", "statusClosed": "Clôturé", "statusArchived": "Archivé",
+    "showingCount": "Affichage de {{count}} sur {{total}} examens", "noMatching": "Aucun examen ne correspond à vos filtres." },
   "submissions": { "publishAll": "Publier les résultats aux étudiants", "publishConfirm": "Publier les résultats à tous les étudiants de cet examen ?" },
   "join": { "title": "Rejoindre un examen", "subtitle": "Entrez le code d'accès à 8 caractères fourni par votre enseignant.",
     "codeLabel": "Code d'accès (8 caractères)", "submit": "S'inscrire à l'examen" },
@@ -75,7 +78,12 @@
     "inviteModalHint": "Entrez l'e-mail ou le numéro de matricule de l'étudiant pour l'inscrire directement.",
     "studentIdentifier": "E-mail ou Matricule", "deleteConfirm": "Archiver cette classe ? Les étudiants n'y auront plus accès.",
     "removeStudentConfirm": "Retirer cet étudiant de la classe ?", "unassignCourseConfirm": "Désassigner ce cours de cette classe ?",
-    "created": "Classe créée ! Code d'invitation : ", "updated": "Classe mise à jour avec succès"
+    "created": "Classe créée ! Code d'invitation : ", "updated": "Classe mise à jour avec succès",
+    "searchPlaceholder": "Rechercher par nom, code ou année...", "all": "Toutes", "active": "Actives", "archived": "Archivées",
+    "archivedBadge": "Archivée", "archive": "Archiver", "restore": "Restaurer",
+    "archivedSuccess": "Classe archivée avec succès.", "restoredSuccess": "Classe restaurée avec succès.",
+    "restoreConfirm": "Restaurer cette classe archivée ?", "noMatching": "Aucune classe ne correspond à votre filtre",
+    "noMatchingSubtitle": "Essayez de changer le filtre de statut ou d'effacer la recherche."
   },
   "courses": {
     "title": "Cours", "subtitle": "Créez des cours et assignez-les à vos classes.",
@@ -88,7 +96,12 @@
     "noAvailableClasses": "Aucune classe créée pour le moment.", "manageAssignments": "Gérer les classes",
     "modalHint": "Indiquez le code, le nom et sélectionnez les classes assignées.",
     "created": "Cours créé avec succès", "updated": "Cours mis à jour avec succès",
-    "archiveConfirm": "Archiver ce cours ?"
+    "archiveConfirm": "Archiver ce cours ?",
+    "all": "Tous", "active": "Actifs", "inactive": "Inactifs",
+    "activeBadge": "Actif", "inactiveBadge": "Inactif",
+    "activate": "Activer", "deactivate": "Désactiver",
+    "activateConfirm": "Activer ce cours ?", "deactivateConfirm": "Désactiver ce cours ? Il sera marqué inactif.",
+    "activatedSuccess": "Cours activé avec succès.", "deactivatedSuccess": "Cours désactivé avec succès."
   },
   "errors": {
     "INVALID_CREDENTIALS": "E-mail ou mot de passe incorrect.", "EMAIL_NOT_VERIFIED": "Veuillez d'abord vérifier votre e-mail.",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, Plus, Trash2, Edit3, Users, Building, Search, Check, Layers } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit3, Users, Building, Search, Check, Layers, Power, PowerOff } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
 
@@ -14,6 +14,7 @@ export default function Courses() {
   const [successMsg, setSuccessMsg] = useState('');
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'inactive'
 
   // Create / Edit modal
   const [showModal, setShowModal] = useState(false);
@@ -31,8 +32,8 @@ export default function Courses() {
     setError('');
     try {
       const [courseList, classList, deptList] = await Promise.all([
-        api.get('/academic/courses'),
-        api.get('/academic/classes?mine=true'),
+        api.get('/academic/courses?status=all'),
+        api.get('/academic/classes?mine=true&status=all'),
         api.get('/academic/departments'),
       ]);
       setCourses(courseList);
@@ -123,7 +124,31 @@ export default function Courses() {
     }
   }
 
+  async function handleToggleStatus(course) {
+    const isActive = Boolean(course.is_active);
+    const confirmMsg = isActive
+      ? t('courses.deactivateConfirm', 'Deactivate this course? It will be marked inactive.')
+      : t('courses.activateConfirm', 'Activate this course?');
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      if (isActive) {
+        await api.post(`/academic/courses/${course.id}/deactivate`);
+        setSuccessMsg(t('courses.deactivatedSuccess', 'Course deactivated.'));
+      } else {
+        await api.post(`/academic/courses/${course.id}/activate`);
+        setSuccessMsg(t('courses.activatedSuccess', 'Course activated successfully.'));
+      }
+      loadData();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   const filteredCourses = courses.filter((c) => {
+    const isActive = Boolean(c.is_active);
+    if (statusFilter === 'active' && !isActive) return false;
+    if (statusFilter === 'inactive' && isActive) return false;
     const matchesSearch =
       c.code.toLowerCase().includes(search.toLowerCase()) ||
       c.name.toLowerCase().includes(search.toLowerCase());
@@ -162,31 +187,55 @@ export default function Courses() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-3 text-ink-soft" />
-          <input
-            type="text"
-            placeholder={t('common.search', 'Search courses by code or name...')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input w-full pl-9 text-sm"
-          />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-3 text-ink-soft" />
+            <input
+              type="text"
+              placeholder={t('common.search', 'Search courses by code or name...')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input w-full pl-9 text-sm"
+            />
+          </div>
+          {departments.length > 0 && (
+            <select
+              value={deptFilter}
+              onChange={(e) => setDeptFilter(e.target.value)}
+              className="input text-sm sm:w-52"
+            >
+              <option value="">{t('common.all', 'All Departments')}</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.code})
+                </option>
+              ))}
+            </select>
+          )}
         </div>
-        {departments.length > 0 && (
-          <select
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            className="input text-sm sm:w-56"
-          >
-            <option value="">{t('common.all', 'All Departments')}</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name} ({d.code})
-              </option>
-            ))}
-          </select>
-        )}
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1 rounded-lg border border-line bg-paper p-1 text-xs">
+          {[
+            { id: 'all', label: t('courses.all', 'All') },
+            { id: 'active', label: t('courses.active', 'Active') },
+            { id: 'inactive', label: t('courses.inactive', 'Inactive') },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setStatusFilter(tab.id)}
+              className={`rounded-md px-3 py-1 font-medium transition ${
+                statusFilter === tab.id
+                  ? 'bg-white text-mark shadow-2xs'
+                  : 'text-ink-soft hover:text-ink'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Course Cards Grid */}
@@ -217,10 +266,32 @@ export default function Courses() {
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="inline-block rounded-md bg-mark-tint px-2.5 py-1 text-xs font-semibold text-mark">
-                      {c.code}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block rounded-md bg-mark-tint px-2.5 py-1 text-xs font-semibold text-mark">
+                        {c.code}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold ${
+                          c.is_active
+                            ? 'bg-ok-tint text-ok'
+                            : 'bg-paper text-ink-faint border border-line'
+                        }`}
+                      >
+                        {c.is_active ? t('courses.activeBadge', 'Active') : t('courses.inactiveBadge', 'Inactive')}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                      <button
+                        onClick={() => handleToggleStatus(c)}
+                        title={c.is_active ? t('courses.deactivate', 'Deactivate Course') : t('courses.activate', 'Activate Course')}
+                        className={`rounded p-1 ${
+                          c.is_active
+                            ? 'text-ink-soft hover:bg-paper hover:text-ink'
+                            : 'text-ok hover:bg-ok-tint'
+                        }`}
+                      >
+                        {c.is_active ? <PowerOff size={15} /> : <Power size={15} />}
+                      </button>
                       <button
                         onClick={() => handleOpenEdit(c)}
                         title={t('courses.editCourse', 'Edit course')}
