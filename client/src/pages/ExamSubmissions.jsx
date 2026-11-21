@@ -253,14 +253,151 @@ export default function ExamSubmissions() {
                     </div>
                   )}
 
-                  {/* Student Answer for text/numeric */}
-                  {(q.type_code === 'SHORT_TEXT' || q.type_code === 'LONG_TEXT' || q.type_code === 'NUMERIC') && (
-                    <div className="mt-3 rounded border border-line bg-paper p-2.5 text-xs">
-                      <span className="font-semibold text-ink-soft">Student Answer:</span>
-                      <div className="mt-1 font-mono text-ink">
-                        {q.student_answer?.value !== undefined ? String(q.student_answer.value) :
-                         q.student_answer?.text ? String(q.student_answer.text) : '(No answer provided)'}
+                  {/* Student Answer for text/numeric/essay */}
+                  {(q.type_code === 'SHORT_TEXT' || q.type_code === 'LONG_TEXT' || q.type_code === 'ESSAY' || q.type_code === 'NUMERIC') && (
+                    <div className="mt-3 rounded border border-line bg-paper p-3 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-ink-soft">Student Answer:</span>
+                        {/* Word counter for text/essay */}
+                        {q.student_answer?.text && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-ink-soft">
+                              Words: {q.student_answer.text.trim().split(/\s+/).filter(Boolean).length}
+                            </span>
+                            {q.config?.maxWords && q.student_answer.text.trim().split(/\s+/).filter(Boolean).length > q.config.maxWords && (
+                              <span className="rounded bg-pen-tint px-1.5 py-0.5 text-[10px] font-bold text-pen">
+                                Exceeds limit ({q.config.maxWords} max)
+                              </span>
+                            )}
+                            {q.config?.minWords && q.student_answer.text.trim().split(/\s+/).filter(Boolean).length < q.config.minWords && (
+                              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                                Below minimum ({q.config.minWords} min)
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
+                      <div className="mt-2 whitespace-pre-wrap font-sans text-sm text-ink leading-relaxed">
+                        {q.student_answer?.value !== undefined ? String(q.student_answer.value) :
+                         q.student_answer?.text ? String(q.student_answer.text) : <span className="italic text-ink-faint">(No answer provided)</span>}
+                      </div>
+                      {q.config?.rubric && (
+                        <div className="mt-2 border-t border-line/60 pt-2 text-[11px] text-ink-soft">
+                          <span className="font-semibold">Grading Rubric:</span> {q.config.rubric}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Matching Evaluation Display */}
+                  {q.type_code === 'MATCHING' && (
+                    <div className="mt-3 space-y-2 rounded border border-line bg-paper p-3 text-xs">
+                      <span className="font-semibold text-ink-soft">Matching Evaluation:</span>
+                      <div className="space-y-1.5 mt-1">
+                        {(q.config?.pairs || []).map((pair, pIdx) => {
+                          const pairKey = pair.id || String(pIdx);
+                          const studentMatch = q.student_answer?.matches?.[pairKey] || q.student_answer?.matches?.[pair.left];
+                          const isCorrect = studentMatch && String(studentMatch).trim().toLowerCase() === String(pair.right).trim().toLowerCase();
+
+                          return (
+                            <div key={pIdx} className="flex items-center justify-between rounded bg-white p-2 border border-line">
+                              <span className="font-medium text-ink">{pair.left}</span>
+                              <div className="flex items-center gap-2">
+                                <span className={isCorrect ? 'text-ok font-semibold' : 'text-pen line-through'}>
+                                  Student: {studentMatch || '(No match)'}
+                                </span>
+                                {!isCorrect && (
+                                  <span className="rounded bg-ok-tint px-1.5 py-0.5 text-[10px] font-bold text-ok">
+                                    Expected: {pair.right}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ordering Evaluation Display */}
+                  {q.type_code === 'ORDERING' && (
+                    <div className="mt-3 space-y-2 rounded border border-line bg-paper p-3 text-xs">
+                      <span className="font-semibold text-ink-soft">Ordering Evaluation:</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                        <div className="rounded bg-white p-2 border border-line">
+                          <span className="text-[11px] font-bold uppercase text-ink-soft block mb-1">Student Order:</span>
+                          <ol className="list-decimal list-inside space-y-1">
+                            {((q.student_answer?.order || q.student_answer?.items) || []).map((item, i) => {
+                              const isCorrectPos = q.config?.items?.[i] && String(item).trim() === String(q.config.items[i]).trim();
+                              return (
+                                <li key={i} className={isCorrectPos ? 'text-ok font-medium' : 'text-pen'}>
+                                  {item} {isCorrectPos ? '✓' : '✗'}
+                                </li>
+                              );
+                            })}
+                          </ol>
+                        </div>
+                        <div className="rounded bg-white p-2 border border-line">
+                          <span className="text-[11px] font-bold uppercase text-ok block mb-1">Correct Key Order:</span>
+                          <ol className="list-decimal list-inside space-y-1">
+                            {(q.config?.items || []).map((item, i) => (
+                              <li key={i} className="text-ink font-medium">{item}</li>
+                            ))}
+                          </ol>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fill in the Blanks Evaluation Display */}
+                  {q.type_code === 'FILL_BLANK' && (
+                    <div className="mt-3 space-y-2 rounded border border-line bg-paper p-3 text-xs">
+                      <span className="font-semibold text-ink-soft">Blanks Evaluation:</span>
+                      <div className="space-y-1.5 mt-1">
+                        {(q.config?.blanks || []).map((b, bIdx) => {
+                          const blankKey = b.id ?? String(bIdx + 1);
+                          const studentVal = q.student_answer?.blanks?.[blankKey] || q.student_answer?.blanks?.[bIdx] || '';
+                          const rawAcceptable = b.acceptableAnswers || b.acceptable || (b.answer ? [b.answer] : []);
+                          const acceptable = (Array.isArray(rawAcceptable) ? rawAcceptable : [rawAcceptable]).map((s) => String(s).trim().toLowerCase());
+                          const isCorrect = studentVal && acceptable.includes(String(studentVal).trim().toLowerCase());
+
+                          return (
+                            <div key={bIdx} className="flex items-center justify-between rounded bg-white p-2 border border-line">
+                              <span className="font-medium text-ink">Blank {b.id || bIdx + 1}:</span>
+                              <div className="flex items-center gap-2">
+                                <span className={isCorrect ? 'text-ok font-semibold' : 'text-pen'}>
+                                  "{studentVal || '(blank)'}" {isCorrect ? '✓' : '✗'}
+                                </span>
+                                <span className="text-ink-soft text-[10px]">
+                                  (Accepted: {Array.isArray(rawAcceptable) ? rawAcceptable.join(', ') : rawAcceptable})
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Programming / Code Submission Display */}
+                  {q.type_code === 'CODE' && (
+                    <div className="mt-3 rounded border border-line bg-slate-950 p-3 text-xs text-white">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 text-slate-400">
+                        <span className="font-mono text-xs font-semibold text-emerald-400">
+                          {q.student_answer?.language || q.config?.language || 'Code submission'}
+                        </span>
+                        <span className="text-[11px]">
+                          {q.student_answer?.code ? `${q.student_answer.code.split('\n').length} lines` : 'No code'}
+                        </span>
+                      </div>
+                      <pre className="overflow-x-auto font-mono text-xs leading-relaxed text-emerald-300 whitespace-pre-wrap">
+                        {q.student_answer?.code || '// No code submitted'}
+                      </pre>
+                      {q.config?.expectedOutput && (
+                        <div className="mt-3 border-t border-slate-800 pt-2 text-[11px] text-slate-400">
+                          <span className="font-semibold text-slate-300">Expected / Notes:</span> {q.config.expectedOutput}
+                        </div>
+                      )}
                     </div>
                   )}
 

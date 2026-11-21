@@ -173,7 +173,19 @@
     "addCategoryQuick": "+ Nouvelle catégorie",
     "noCategories": "Aucune catégorie créée pour l'instant.",
     "archiveTitle": "Archiver la question",
-    "deleteCategoryTitle": "Supprimer la catégorie"
+    "deleteCategoryTitle": "Supprimer la catégorie",
+    "types": {
+      "MCQ_SINGLE": "Choix unique (QCM)",
+      "MCQ_MULTI": "Choix multiple (QCM)",
+      "TRUE_FALSE": "Vrai / Faux",
+      "NUMERIC": "Réponse numérique",
+      "SHORT_TEXT": "Texte court",
+      "ESSAY": "Dissertation / Réponse longue",
+      "MATCHING": "Correspondance (Appariement)",
+      "ORDERING": "Mise en ordre (Séquence)",
+      "FILL_BLANK": "Texte à trous",
+      "CODE": "Programmation / Code"
+    }
   },
   "exams": {
     "title": "Gestion des examens",

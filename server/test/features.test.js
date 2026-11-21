@@ -5,7 +5,7 @@ import { client, createAdmin, query, resetDb, startApp } from './helpers.js';
 
 test.beforeEach(async () => {
   await resetDb();
-  for (const code of ['MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE', 'NUMERIC', 'SHORT_TEXT']) {
+  for (const code of ['MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE', 'NUMERIC', 'SHORT_TEXT', 'LONG_TEXT', 'ESSAY', 'FILL_BLANK', 'MATCHING', 'ORDERING', 'CODE']) {
     await query(`INSERT INTO question_types (code) VALUES ($1) ON CONFLICT DO NOTHING`, [code]);
   }
 });
@@ -377,6 +377,203 @@ test('Teacher Class & Course Management: Create class, invite students, create c
     assert.equal(actCourseRes.status, 200);
     const restoredCourse = await cProf.get('/academic/courses?status=active');
     assert.equal(restoredCourse.body.data.filter((c) => c.id === course.id).length, 1);
+  } finally {
+    await app.close();
+  }
+});
+
+test('New Question Types: MATCHING, ORDERING, FILL_BLANK, ESSAY and CODE submission and grading', async () => {
+  const app = await startApp();
+  try {
+    const admin = await createAdmin();
+    const prof = await createProfessor('prof_newtypes@test.local');
+    const student = await createStudent('student_newtypes@test.local');
+
+    const cAdmin = client(app.url);
+    await cAdmin.login(admin.email, admin.password);
+    const dept = await cAdmin.post('/academic/departments', { code: 'SCI', name: 'Science' });
+    const course = await cAdmin.post('/academic/courses', { departmentId: dept.body.data.id, code: 'SCI200', name: 'Modern Science' });
+    const courseId = course.body.data.id;
+
+    const cProf = client(app.url);
+    await cProf.login(prof.email, prof.password);
+
+    // 1. MATCHING Question
+    const qMatching = await cProf.post('/questions', {
+      typeCode: 'MATCHING',
+      bodyMd: 'Match the countries with their capitals.',
+      defaultPoints: 4,
+      config: {
+        pairs: [
+          { id: '1', left: 'France', right: 'Paris' },
+          { id: '2', left: 'Germany', right: 'Berlin' },
+        ],
+      },
+    });
+    assert.equal(qMatching.status, 201);
+
+    // 2. ORDERING Question
+    const qOrdering = await cProf.post('/questions', {
+      typeCode: 'ORDERING',
+      bodyMd: 'Put the lifecycle phases in chronological order.',
+      defaultPoints: 3,
+      config: {
+        items: ['Planning', 'Development', 'Testing'],
+      },
+    });
+    assert.equal(qOrdering.status, 201);
+
+    // 3. FILL_BLANK Question
+    const qFill = await cProf.post('/questions', {
+      typeCode: 'FILL_BLANK',
+      bodyMd: 'Water is composed of hydrogen and [blank-1].',
+      defaultPoints: 2,
+      config: {
+        blanks: [
+          { id: '1', acceptableAnswers: ['oxygen', 'O2'] },
+        ],
+      },
+    });
+    assert.equal(qFill.status, 201);
+
+    // 4. ESSAY Question
+    const qEssay = await cProf.post('/questions', {
+      typeCode: 'ESSAY',
+      bodyMd: 'Discuss the impact of computing on modern society.',
+      defaultPoints: 5,
+      config: { minWords: 20, maxWords: 200, rubric: 'Clarity, depth, arguments' },
+    });
+    assert.equal(qEssay.status, 201);
+
+    // 5. CODE Question
+    const qCode = await cProf.post('/questions', {
+      typeCode: 'CODE',
+      bodyMd: 'Write a python function `add(a, b)` that returns their sum.',
+      defaultPoints: 5,
+      config: { language: 'python', starterCode: 'def add(a, b):\n    pass\n' },
+    });
+    assert.equal(qCode.status, 201);
+
+    // Create exam
+    const opensAt = new Date(Date.now() - 60_000).toISOString();
+    const closesAt = new Date(Date.now() + 3600_000).toISOString();
+    const examRes = await cProf.post('/exams', {
+      courseId,
+      title: 'Advanced Exam with New Question Types',
+      opensAt,
+      closesAt,
+      durationMinutes: 90,
+      maxScore: 19,
+      passingScore: 10,
+      resultsPolicy: 'MANUAL',
+      shuffleQuestions: false,
+    });
+    assert.equal(examRes.status, 201);
+    const examId = examRes.body.data.id;
+
+    // Assign all 5 questions
+    await cProf.post(`/exams/${examId}/questions`, {
+      questions: [
+        { questionVersionId: qMatching.body.data.id, position: 1, points: 4 },
+        { questionVersionId: qOrdering.body.data.id, position: 2, points: 3 },
+        { questionVersionId: qFill.body.data.id, position: 3, points: 2 },
+        { questionVersionId: qEssay.body.data.id, position: 4, points: 5 },
+        { questionVersionId: qCode.body.data.id, position: 5, points: 5 },
+      ],
+    });
+
+    await cProf.post(`/exams/${examId}/publish`);
+
+    const codeRes = await cProf.post(`/exams/${examId}/codes`, {
+      expiresAt: closesAt,
+      maxUses: 10,
+    });
+    const accessCode = codeRes.body.data.code;
+
+    // Student joins and takes exam
+    const cStudent = client(app.url);
+    await cStudent.login(student.email, student.password);
+    await cStudent.post('/student/exams/join', { code: accessCode });
+
+    const startRes = await cStudent.post(`/student/exams/${examId}/start`);
+    const sessionId = startRes.body.data.sessionId;
+
+    const sessionData = await cStudent.get(`/student/sessions/${sessionId}`);
+    assert.equal(sessionData.status, 200);
+    assert.equal(sessionData.body.data.questions.length, 5);
+
+    // Verify student config was sanitized!
+    const studentQMatching = sessionData.body.data.questions.find((q) => q.typeCode === 'MATCHING');
+    assert.ok(studentQMatching.config.leftItems);
+    assert.ok(studentQMatching.config.rightItems);
+    // Crucial: no answer pairs leaked to student!
+    assert.equal(studentQMatching.config.pairs, undefined);
+
+    const studentQFill = sessionData.body.data.questions.find((q) => q.typeCode === 'FILL_BLANK');
+    assert.ok(studentQFill.config.blanks);
+    // Crucial: acceptable answers not leaked!
+    assert.equal(studentQFill.config.blanks[0].acceptableAnswers, undefined);
+
+    // Student answers
+    // 1. MATCHING: France -> Paris, Germany -> Berlin (full 4 pts)
+    await cStudent.post(`/student/sessions/${sessionId}/save`, {
+      questionVersionId: qMatching.body.data.id,
+      answer: { matches: { '1': 'Paris', '2': 'Berlin' } },
+    });
+
+    // 2. ORDERING: Planning, Development, Testing (full 3 pts)
+    await cStudent.post(`/student/sessions/${sessionId}/save`, {
+      questionVersionId: qOrdering.body.data.id,
+      answer: { order: ['Planning', 'Development', 'Testing'] },
+    });
+
+    // 3. FILL_BLANK: oxygen (full 2 pts)
+    await cStudent.post(`/student/sessions/${sessionId}/save`, {
+      questionVersionId: qFill.body.data.id,
+      answer: { blanks: { '1': 'oxygen' } },
+    });
+
+    // 4. ESSAY: student text
+    await cStudent.post(`/student/sessions/${sessionId}/save`, {
+      questionVersionId: qEssay.body.data.id,
+      answer: { text: 'Computing has fundamentally revolutionized communication, commerce, and education worldwide.' },
+    });
+
+    // 5. CODE: student python code
+    await cStudent.post(`/student/sessions/${sessionId}/save`, {
+      questionVersionId: qCode.body.data.id,
+      answer: { code: 'def add(a, b):\n    return a + b\n', language: 'python' },
+    });
+
+    // Submit exam
+    const submitRes = await cStudent.post(`/student/sessions/${sessionId}/submit`);
+    assert.equal(submitRes.status, 200);
+
+    // Check grading:
+    // Auto score should be 4 + 3 + 2 = 9 points (matching, ordering, fill blank graded automatically)
+    // Essay and Code require manual grading
+    const subDetails = await cProf.get(`/exams/${examId}/submissions/${sessionId}`);
+    assert.equal(subDetails.status, 200);
+    assert.equal(Number(subDetails.body.data.session.total_score), 9);
+
+    // Professor manually grades Essay (give 5 pts) and Code (give 5 pts)
+    await cProf.post(`/exams/${examId}/submissions/${sessionId}/grade`, {
+      questionVersionId: qEssay.body.data.id,
+      manualScore: 5,
+      comment: 'Excellent argumentation and succinct style.',
+    });
+    await cProf.post(`/exams/${examId}/submissions/${sessionId}/grade`, {
+      questionVersionId: qCode.body.data.id,
+      manualScore: 5,
+      comment: 'Clean implementation.',
+    });
+
+    // Verify grades after manual grading
+    const afterGrade = await cProf.get(`/exams/${examId}/submissions/${sessionId}`);
+    const essayGrade = afterGrade.body.data.questions.find((q) => q.type_code === 'ESSAY');
+    const codeGrade = afterGrade.body.data.questions.find((q) => q.type_code === 'CODE');
+    assert.equal(Number(essayGrade.final_score), 5);
+    assert.equal(Number(codeGrade.final_score), 5);
   } finally {
     await app.close();
   }

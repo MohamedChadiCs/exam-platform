@@ -96,16 +96,69 @@ export async function gradeSession(sessionId, dbClient) {
         } else {
           autoScore = 0;
         }
-      } else if (q.type_code === 'SHORT_TEXT' || q.type_code === 'LONG_TEXT' || q.type_code === 'FILL_BLANK') {
-        if (q.type_code === 'FILL_BLANK' && q.config?.acceptableAnswers && Array.isArray(q.config.acceptableAnswers)) {
+      } else if (q.type_code === 'MATCHING') {
+        const pairs = Array.isArray(q.config?.pairs) ? q.config.pairs : [];
+        const studentMatches = studentAns.matches || studentAns.pairs || {};
+        if (pairs.length === 0) {
+          autoScore = 0;
+        } else {
+          let correctPairs = 0;
+          for (let i = 0; i < pairs.length; i++) {
+            const p = pairs[i];
+            const pairKey = p.id || String(i);
+            const studentRight = studentMatches[pairKey] !== undefined ? studentMatches[pairKey] : studentMatches[p.left];
+            if (studentRight && String(studentRight).trim().toLowerCase() === String(p.right).trim().toLowerCase()) {
+              correctPairs++;
+            }
+          }
+          autoScore = Math.round((correctPairs / pairs.length) * maxPts * 100) / 100;
+        }
+      } else if (q.type_code === 'ORDERING') {
+        const items = Array.isArray(q.config?.items) ? q.config.items : [];
+        const studentOrder = Array.isArray(studentAns.order) ? studentAns.order : (Array.isArray(studentAns.items) ? studentAns.items : []);
+        if (items.length === 0 || studentOrder.length === 0) {
+          autoScore = 0;
+        } else {
+          let correctPositions = 0;
+          for (let i = 0; i < items.length; i++) {
+            if (studentOrder[i] && String(studentOrder[i]).trim() === String(items[i]).trim()) {
+              correctPositions++;
+            }
+          }
+          autoScore = Math.round((correctPositions / items.length) * maxPts * 100) / 100;
+        }
+      } else if (q.type_code === 'FILL_BLANK') {
+        if (Array.isArray(q.config?.blanks) && q.config.blanks.length > 0) {
+          let correctBlanks = 0;
+          const blanks = q.config.blanks;
+          for (let i = 0; i < blanks.length; i++) {
+            const b = blanks[i];
+            const blankKey = b.id ?? String(i + 1);
+            const studentVal = String(
+              (studentAns.blanks && (studentAns.blanks[blankKey] ?? studentAns.blanks[i])) ??
+              studentAns[blankKey] ??
+              ''
+            ).trim().toLowerCase();
+            const rawAcceptable = b.acceptableAnswers || b.acceptable || (b.answer ? [b.answer] : []);
+            const acceptable = (Array.isArray(rawAcceptable) ? rawAcceptable : [rawAcceptable]).map((s) => String(s).trim().toLowerCase());
+            if (studentVal && acceptable.includes(studentVal)) {
+              correctBlanks++;
+            }
+          }
+          autoScore = Math.round((correctBlanks / blanks.length) * maxPts * 100) / 100;
+        } else if (q.config?.acceptableAnswers && Array.isArray(q.config.acceptableAnswers)) {
           const acceptable = q.config.acceptableAnswers.map((s) => String(s).trim().toLowerCase());
-          const text = String(studentAns.text ?? '').trim().toLowerCase();
+          const text = String(studentAns.text ?? studentAns.value ?? '').trim().toLowerCase();
           autoScore = acceptable.includes(text) ? maxPts : 0;
         } else {
           needsManual = true;
           anyNeedsManual = true;
           autoScore = null;
         }
+      } else if (q.type_code === 'SHORT_TEXT' || q.type_code === 'LONG_TEXT' || q.type_code === 'ESSAY' || q.type_code === 'CODE') {
+        needsManual = true;
+        anyNeedsManual = true;
+        autoScore = null;
       } else {
         needsManual = true;
         anyNeedsManual = true;

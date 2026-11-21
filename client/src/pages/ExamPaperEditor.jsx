@@ -162,6 +162,8 @@ export default function ExamPaperEditor() {
   // Question editing helpers
   function addQuestion(type = 'MCQ_SINGLE') {
     let defaultOptions = [];
+    let config = {};
+
     if (type === 'MCQ_SINGLE' || type === 'MCQ_MULTI') {
       defaultOptions = [
         { bodyMd: 'Option A', isCorrect: true },
@@ -174,15 +176,32 @@ export default function ExamPaperEditor() {
         { bodyMd: 'True', isCorrect: true },
         { bodyMd: 'False', isCorrect: false },
       ];
+    } else if (type === 'NUMERIC') {
+      config = { answer: 10, tolerance: 0.1 };
+    } else if (type === 'SHORT_TEXT' || type === 'ESSAY') {
+      config = { minWords: 0, maxWords: 300 };
+    } else if (type === 'MATCHING') {
+      config = {
+        pairs: [
+          { id: '1', left: 'Item 1', right: 'Match 1' },
+          { id: '2', left: 'Item 2', right: 'Match 2' },
+        ],
+      };
+    } else if (type === 'ORDERING') {
+      config = { items: ['Step 1', 'Step 2', 'Step 3'] };
+    } else if (type === 'FILL_BLANK') {
+      config = { blanks: [{ id: '1', acceptableAnswers: ['answer'] }] };
+    } else if (type === 'CODE') {
+      config = { language: 'python', starterCode: '# Write your code here\n' };
     }
 
     const newQ = {
       typeCode: type,
-      bodyMd: 'Type your question statement here...',
+      bodyMd: type === 'FILL_BLANK' ? 'The capital of France is [blank-1].' : 'Type your question statement here...',
       explanationMd: '',
       points: 5,
       categoryId: '',
-      config: type === 'NUMERIC' ? { answer: 10, tolerance: 0.1 } : {},
+      config,
       options: defaultOptions,
     };
     setQuestions([...questions, newQ]);
@@ -511,14 +530,36 @@ export default function ExamPaperEditor() {
                       onChange={(e) => {
                         const newType = e.target.value;
                         let opts = q.options;
+                        let newConfig = { ...q.config };
                         if (newType === 'TRUE_FALSE') {
                           opts = [{ bodyMd: 'True', isCorrect: true }, { bodyMd: 'False', isCorrect: false }];
-                        } else if (newType === 'NUMERIC' || newType === 'SHORT_TEXT') {
+                        } else if (newType === 'NUMERIC') {
                           opts = [];
+                          newConfig = { answer: 10, tolerance: 0.1 };
+                        } else if (newType === 'SHORT_TEXT' || newType === 'ESSAY') {
+                          opts = [];
+                          newConfig = { minWords: 0, maxWords: 300 };
+                        } else if (newType === 'MATCHING') {
+                          opts = [];
+                          newConfig = {
+                            pairs: [
+                              { id: '1', left: 'Item 1', right: 'Match 1' },
+                              { id: '2', left: 'Item 2', right: 'Match 2' },
+                            ],
+                          };
+                        } else if (newType === 'ORDERING') {
+                          opts = [];
+                          newConfig = { items: ['Step 1', 'Step 2', 'Step 3'] };
+                        } else if (newType === 'FILL_BLANK') {
+                          opts = [];
+                          newConfig = { blanks: [{ id: '1', acceptableAnswers: ['answer'] }] };
+                        } else if (newType === 'CODE') {
+                          opts = [];
+                          newConfig = { language: 'python', starterCode: '# Write your code here\n' };
                         } else if (opts.length === 0) {
                           opts = [{ bodyMd: 'Option A', isCorrect: true }, { bodyMd: 'Option B', isCorrect: false }];
                         }
-                        updateQuestion(idx, { typeCode: newType, options: opts });
+                        updateQuestion(idx, { typeCode: newType, options: opts, config: newConfig });
                       }}
                       className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700 hover:border-slate-300"
                     >
@@ -527,6 +568,11 @@ export default function ExamPaperEditor() {
                       <option value="TRUE_FALSE">True / False</option>
                       <option value="NUMERIC">Numeric Calculation</option>
                       <option value="SHORT_TEXT">Short Text / Open Ended</option>
+                      <option value="ESSAY">Essay / Long Answer</option>
+                      <option value="MATCHING">Matching (Pairs)</option>
+                      <option value="ORDERING">Ordering (Sequence)</option>
+                      <option value="FILL_BLANK">Fill in the Blanks</option>
+                      <option value="CODE">Programming / Code</option>
                     </select>
                   </div>
 
@@ -705,15 +751,253 @@ export default function ExamPaperEditor() {
                     </div>
                   )}
 
-                  {/* Short Text Ruled Writing Lines (Visual Exam Paper representation) */}
-                  {q.typeCode === 'SHORT_TEXT' && (
+                  {/* Short Text / Essay Ruled Writing Lines (Visual Exam Paper representation) */}
+                  {(q.typeCode === 'SHORT_TEXT' || q.typeCode === 'ESSAY') && (
                     <div className="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50/50 p-3">
-                      <div className="text-[11px] italic text-slate-500">
-                        [Student will write their answer in an open response box during the exam]
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                        <span className="italic">[Student will write their answer in an open response box during the exam]</span>
+                        <div className="flex items-center gap-2">
+                          <span>Word limits:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Min"
+                            value={q.config?.minWords ?? ''}
+                            onChange={(e) => updateQuestion(idx, { config: { ...q.config, minWords: parseInt(e.target.value, 10) || 0 } })}
+                            className="w-14 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-center"
+                          />
+                          <span>–</span>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Max"
+                            value={q.config?.maxWords ?? q.config?.wordLimit ?? ''}
+                            onChange={(e) => updateQuestion(idx, {
+                              config: {
+                                ...q.config,
+                                maxWords: parseInt(e.target.value, 10) || null,
+                                wordLimit: parseInt(e.target.value, 10) || null,
+                              },
+                            })}
+                            className="w-16 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-center font-bold text-slate-700"
+                          />
+                          <span>words</span>
+                        </div>
                       </div>
                       <div className="border-b border-dashed border-slate-300 py-1"></div>
                       <div className="border-b border-dashed border-slate-300 py-1"></div>
                       <div className="border-b border-dashed border-slate-300 py-1"></div>
+                    </div>
+                  )}
+
+                  {/* Matching configuration */}
+                  {q.typeCode === 'MATCHING' && (
+                    <div className="mt-3 rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-xs">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="font-semibold text-slate-700">Matching Pairs:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const pairs = [...(q.config?.pairs || []), { id: String(Date.now()), left: '', right: '' }];
+                            updateQuestion(idx, { config: { ...q.config, pairs } });
+                          }}
+                          className="font-semibold text-mark hover:underline"
+                        >
+                          + Add Pair
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {(q.config?.pairs || []).map((pair, pIdx) => (
+                          <div key={pIdx} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={pair.left}
+                              onChange={(e) => {
+                                const newPairs = [...(q.config?.pairs || [])];
+                                newPairs[pIdx].left = e.target.value;
+                                updateQuestion(idx, { config: { ...q.config, pairs: newPairs } });
+                              }}
+                              placeholder={`Left prompt ${pIdx + 1}`}
+                              className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+                            />
+                            <span className="text-slate-400 font-bold">⇄</span>
+                            <input
+                              type="text"
+                              value={pair.right}
+                              onChange={(e) => {
+                                const newPairs = [...(q.config?.pairs || [])];
+                                newPairs[pIdx].right = e.target.value;
+                                updateQuestion(idx, { config: { ...q.config, pairs: newPairs } });
+                              }}
+                              placeholder={`Correct match ${pIdx + 1}`}
+                              className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+                            />
+                            {(q.config?.pairs || []).length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newPairs = (q.config?.pairs || []).filter((_, i) => i !== pIdx);
+                                  updateQuestion(idx, { config: { ...q.config, pairs: newPairs } });
+                                }}
+                                className="text-slate-400 hover:text-pen"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ordering configuration */}
+                  {q.typeCode === 'ORDERING' && (
+                    <div className="mt-3 rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-xs">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold text-slate-700">Correct Sequence of Steps:</span>
+                          <span className="ms-2 text-[11px] text-slate-500">(shuffled for students)</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const items = [...(q.config?.items || []), ''];
+                            updateQuestion(idx, { config: { ...q.config, items } });
+                          }}
+                          className="font-semibold text-mark hover:underline"
+                        >
+                          + Add Step
+                        </button>
+                      </div>
+                      <div className="space-y-1.5">
+                        {(q.config?.items || []).map((item, iIdx) => (
+                          <div key={iIdx} className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700">
+                              {iIdx + 1}
+                            </span>
+                            <input
+                              type="text"
+                              value={item}
+                              onChange={(e) => {
+                                const newItems = [...(q.config?.items || [])];
+                                newItems[iIdx] = e.target.value;
+                                updateQuestion(idx, { config: { ...q.config, items: newItems } });
+                              }}
+                              placeholder={`Step ${iIdx + 1}...`}
+                              className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+                            />
+                            {(q.config?.items || []).length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newItems = (q.config?.items || []).filter((_, i) => i !== iIdx);
+                                  updateQuestion(idx, { config: { ...q.config, items: newItems } });
+                                }}
+                                className="text-slate-400 hover:text-pen"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fill in the Blanks configuration */}
+                  {q.typeCode === 'FILL_BLANK' && (
+                    <div className="mt-3 rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-xs">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold text-slate-700">Blanks & Acceptable Answers:</span>
+                          <span className="ms-2 text-[11px] text-slate-500">(use [blank-1], [blank-2] in prompt)</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const blanks = [
+                              ...(q.config?.blanks || []),
+                              { id: String((q.config?.blanks || []).length + 1), acceptableAnswers: [''] },
+                            ];
+                            updateQuestion(idx, { config: { ...q.config, blanks } });
+                          }}
+                          className="font-semibold text-mark hover:underline"
+                        >
+                          + Add Blank
+                        </button>
+                      </div>
+                      <div className="space-y-1.5">
+                        {(q.config?.blanks || []).map((b, bIdx) => (
+                          <div key={bIdx} className="flex items-center gap-2">
+                            <span className="font-medium text-slate-600 shrink-0">Blank {b.id || bIdx + 1}:</span>
+                            <input
+                              type="text"
+                              value={Array.isArray(b.acceptableAnswers) ? b.acceptableAnswers.join(', ') : (b.acceptableAnswers || '')}
+                              onChange={(e) => {
+                                const newBlanks = [...(q.config?.blanks || [])];
+                                newBlanks[bIdx] = {
+                                  ...newBlanks[bIdx],
+                                  acceptableAnswers: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                                };
+                                updateQuestion(idx, { config: { ...q.config, blanks: newBlanks } });
+                              }}
+                              placeholder="Acceptable answers (comma separated, e.g. Paris, paris)"
+                              className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+                            />
+                            {(q.config?.blanks || []).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newBlanks = (q.config?.blanks || []).filter((_, i) => i !== bIdx);
+                                  updateQuestion(idx, { config: { ...q.config, blanks: newBlanks } });
+                                }}
+                                className="text-slate-400 hover:text-pen"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Programming / Code configuration */}
+                  {q.typeCode === 'CODE' && (
+                    <div className="mt-3 rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-700">Code Editor Setup:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-500">Language:</span>
+                          <select
+                            value={q.config?.language || 'python'}
+                            onChange={(e) => updateQuestion(idx, { config: { ...q.config, language: e.target.value } })}
+                            className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium"
+                          >
+                            <option value="python">Python</option>
+                            <option value="javascript">JavaScript</option>
+                            <option value="typescript">TypeScript</option>
+                            <option value="java">Java</option>
+                            <option value="cpp">C++</option>
+                            <option value="c">C</option>
+                            <option value="csharp">C#</option>
+                            <option value="go">Go</option>
+                            <option value="rust">Rust</option>
+                            <option value="sql">SQL</option>
+                            <option value="html">HTML / CSS</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block mb-1">Starter / Template Code:</span>
+                        <textarea
+                          rows={4}
+                          value={q.config?.starterCode ?? ''}
+                          onChange={(e) => updateQuestion(idx, { config: { ...q.config, starterCode: e.target.value } })}
+                          placeholder="# Starter code for students..."
+                          className="w-full rounded border border-slate-300 bg-white p-2 font-mono text-xs focus:border-mark focus:outline-none"
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -803,7 +1087,42 @@ export default function ExamPaperEditor() {
                 onClick={() => addQuestion('SHORT_TEXT')}
                 className="btn-quiet text-xs py-1.5 px-3"
               >
-                + Short Text / Essay
+                + Short Text
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('ESSAY')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Essay / Long Answer
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('MATCHING')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Matching (Pairs)
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('ORDERING')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Ordering (Sequence)
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('FILL_BLANK')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Fill in the Blanks
+              </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('CODE')}
+                className="btn-quiet text-xs py-1.5 px-3"
+              >
+                + Programming / Code
               </button>
               <button
                 type="button"

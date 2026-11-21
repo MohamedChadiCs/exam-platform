@@ -173,7 +173,19 @@
     "addCategoryQuick": "+ تصنيف جديد",
     "noCategories": "لا توجد تصنيفات بعد.",
     "archiveTitle": "أرشفة السؤال",
-    "deleteCategoryTitle": "حذف الفئة"
+    "deleteCategoryTitle": "حذف الفئة",
+    "types": {
+      "MCQ_SINGLE": "اختيار من متعدد (إجابة واحدة)",
+      "MCQ_MULTI": "اختيار من متعدد (إجابات متعددة)",
+      "TRUE_FALSE": "صح / خطأ",
+      "NUMERIC": "إجابة عددية",
+      "SHORT_TEXT": "إجابة قصيرة",
+      "ESSAY": "مقال / إجابة طويلة",
+      "MATCHING": "مطابقة (أزواج)",
+      "ORDERING": "ترتيب (تسلسل)",
+      "FILL_BLANK": "ملء الفراغات",
+      "CODE": "برمجة / تسليم كود"
+    }
   },
   "exams": {
     "title": "إدارة الامتحانات",

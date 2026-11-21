@@ -20,6 +20,44 @@ function shuffle(array) {
   return arr;
 }
 
+function sanitizeConfigForStudent(typeCode, config) {
+  if (!config) return {};
+  if (typeCode === 'MATCHING') {
+    const pairs = Array.isArray(config.pairs) ? config.pairs : [];
+    const leftItems = pairs.map((p, idx) => ({ id: p.id || String(idx), text: p.left }));
+    const rightItems = shuffle(pairs.map((p, idx) => ({ id: p.id || String(idx), text: p.right })));
+    return { leftItems, rightItems };
+  }
+  if (typeCode === 'ORDERING') {
+    const items = Array.isArray(config.items) ? config.items : [];
+    return { items: shuffle(items) };
+  }
+  if (typeCode === 'FILL_BLANK') {
+    const blanks = Array.isArray(config.blanks)
+      ? config.blanks.map((b, idx) => ({
+          id: b.id || String(idx + 1),
+          placeholder: b.placeholder || `Blank ${idx + 1}`,
+        }))
+      : [];
+    return { blanks, template: config.template || null };
+  }
+  if (typeCode === 'ESSAY' || typeCode === 'LONG_TEXT' || typeCode === 'SHORT_TEXT') {
+    return {
+      minWords: config.minWords ?? null,
+      maxWords: config.maxWords ?? config.wordLimit ?? null,
+      wordLimit: config.wordLimit ?? config.maxWords ?? null,
+      rubric: config.rubric ?? null,
+    };
+  }
+  if (typeCode === 'CODE') {
+    return {
+      language: config.language || 'javascript',
+      starterCode: config.starterCode || '',
+    };
+  }
+  return {};
+}
+
 // ==========================================
 // 1. Join Exam via Access Code
 // ==========================================
@@ -320,7 +358,7 @@ studentRouter.get('/sessions/:id', async (req, res) => {
   // Fetch session questions
   const { rows: questions } = await query(
     `SELECT sq.position, sq.points, sq.question_version_id, sq.option_order,
-            qv.type_code, qv.body_md, qv.locale
+            qv.type_code, qv.body_md, qv.locale, qv.config
        FROM session_questions sq
        JOIN question_versions qv ON qv.id = sq.question_version_id
       WHERE sq.session_id = $1
@@ -362,6 +400,7 @@ studentRouter.get('/sessions/:id', async (req, res) => {
       bodyMd: q.body_md,
       points: q.points,
       options: qOptions,
+      config: sanitizeConfigForStudent(q.type_code, q.config),
       savedAnswer: answersMap.get(q.question_version_id) ?? null,
     };
   });
@@ -550,7 +589,7 @@ studentRouter.get('/results/:sessionId', async (req, res) => {
   // If published, include question review
   const { rows: questions } = await query(
     `SELECT sq.position, sq.points AS max_points,
-            qv.type_code, qv.body_md,
+            qv.type_code, qv.body_md, qv.config,
             CASE WHEN $2 = true THEN qv.explanation_md ELSE null END AS explanation_md,
             sa.answer AS student_answer,
             g.final_score

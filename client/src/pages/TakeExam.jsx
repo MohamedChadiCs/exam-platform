@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Clock, ShieldAlert, CheckCircle, ChevronLeft, ChevronRight, Send, AlertTriangle } from 'lucide-react';
+import { Clock, ShieldAlert, CheckCircle, ChevronLeft, ChevronRight, Send, AlertTriangle, ArrowUp, ArrowDown, Code, RotateCcw } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
 
@@ -141,12 +141,37 @@ export default function TakeExam() {
     saveAnswer(qvId, newPayload);
   }
 
+  function countWords(str) {
+    if (!str) return 0;
+    return str.trim().split(/\s+/).filter(Boolean).length;
+  }
+
   function handleTextAnswer(qvId, text) {
     saveAnswer(qvId, { text });
   }
 
   function handleNumericAnswer(qvId, value) {
     saveAnswer(qvId, { value: parseFloat(value) });
+  }
+
+  function handleMatchingAnswer(qvId, leftId, chosenRight) {
+    const current = answers[qvId]?.matches || {};
+    const updated = { ...current, [leftId]: chosenRight };
+    saveAnswer(qvId, { matches: updated });
+  }
+
+  function handleOrderChange(qvId, newOrder) {
+    saveAnswer(qvId, { order: newOrder });
+  }
+
+  function handleBlankAnswer(qvId, blankId, val) {
+    const current = answers[qvId]?.blanks || {};
+    const updated = { ...current, [blankId]: val };
+    saveAnswer(qvId, { blanks: updated });
+  }
+
+  function handleCodeAnswer(qvId, code, language) {
+    saveAnswer(qvId, { code, language });
   }
 
   async function handleAutoSubmit() {
@@ -285,15 +310,194 @@ export default function TakeExam() {
                       className="input w-48 font-mono text-base"
                     />
                   </div>
+                ) : currentQ.typeCode === 'MATCHING' ? (
+                  <div className="space-y-4">
+                    <p className="text-xs text-ink-soft">Pair each item on the left with the correct choice on the right:</p>
+                    <div className="space-y-2.5">
+                      {(currentQ.config?.leftItems || []).map((leftItem, idx) => {
+                        const currentMatch = answers[currentQ.questionVersionId]?.matches?.[leftItem.id] || '';
+                        return (
+                          <div
+                            key={leftItem.id || idx}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-line bg-paper/40 p-3"
+                          >
+                            <span className="text-sm font-medium text-ink flex-1">{leftItem.text}</span>
+                            <div className="flex items-center gap-2 sm:w-1/2">
+                              <span className="text-xs text-ink-soft hidden sm:inline">⇄</span>
+                              <select
+                                value={currentMatch}
+                                onChange={(e) => handleMatchingAnswer(currentQ.questionVersionId, leftItem.id, e.target.value)}
+                                className="input py-1.5 text-xs bg-white flex-1 font-medium"
+                              >
+                                <option value="">-- Select matching option --</option>
+                                {(currentQ.config?.rightItems || []).map((r, rIdx) => (
+                                  <option key={r.id || rIdx} value={r.text}>
+                                    {r.text}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : currentQ.typeCode === 'ORDERING' ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-ink-soft">Arrange the items in the correct sequence using the up/down buttons:</p>
+                    {(() => {
+                      const currentOrder = answers[currentQ.questionVersionId]?.order || currentQ.config?.items || [];
+                      return (
+                        <div className="space-y-2">
+                          {currentOrder.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between gap-3 rounded-lg border border-line bg-white p-3 shadow-2xs"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-paper font-mono text-xs font-bold text-ink">
+                                  {idx + 1}
+                                </span>
+                                <span className="text-sm font-medium text-ink">{item}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => {
+                                    const next = [...currentOrder];
+                                    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                    handleOrderChange(currentQ.questionVersionId, next);
+                                  }}
+                                  className="rounded border border-line p-1 text-ink-soft hover:bg-paper disabled:opacity-30"
+                                  title="Move Up"
+                                >
+                                  <ArrowUp size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={idx === currentOrder.length - 1}
+                                  onClick={() => {
+                                    const next = [...currentOrder];
+                                    [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+                                    handleOrderChange(currentQ.questionVersionId, next);
+                                  }}
+                                  className="rounded border border-line p-1 text-ink-soft hover:bg-paper disabled:opacity-30"
+                                  title="Move Down"
+                                >
+                                  <ArrowDown size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : currentQ.typeCode === 'FILL_BLANK' ? (
+                  <div className="space-y-4">
+                    <p className="text-xs text-ink-soft">Fill in each blank with your answer:</p>
+                    <div className="space-y-2.5">
+                      {(currentQ.config?.blanks && currentQ.config.blanks.length > 0
+                        ? currentQ.config.blanks
+                        : [{ id: '1', placeholder: 'Blank 1' }]
+                      ).map((b, idx) => {
+                        const currentVal = answers[currentQ.questionVersionId]?.blanks?.[b.id] ?? '';
+                        return (
+                          <div key={b.id || idx} className="flex items-center gap-3 rounded-lg border border-line bg-paper/40 p-3">
+                            <span className="text-xs font-semibold text-ink-soft w-20">Blank {b.id || idx + 1}:</span>
+                            <input
+                              type="text"
+                              value={currentVal}
+                              onChange={(e) => handleBlankAnswer(currentQ.questionVersionId, b.id, e.target.value)}
+                              placeholder={`Type answer for ${b.placeholder || `blank ${idx + 1}`}...`}
+                              className="input flex-1 bg-white text-sm"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : currentQ.typeCode === 'CODE' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between rounded-t-lg border border-line bg-slate-900 px-3.5 py-2 text-white">
+                      <div className="flex items-center gap-2">
+                        <Code size={14} className="text-mark" />
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-slate-200">
+                          {currentQ.config?.language || 'python'}
+                        </span>
+                      </div>
+                      {currentQ.config?.starterCode && (
+                        <button
+                          type="button"
+                          onClick={() => handleCodeAnswer(currentQ.questionVersionId, currentQ.config.starterCode, currentQ.config?.language || 'python')}
+                          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"
+                          title="Reset editor to initial starter template"
+                        >
+                          <RotateCcw size={12} /> Reset template
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      rows={12}
+                      value={answers[currentQ.questionVersionId]?.code ?? (currentQ.config?.starterCode || '')}
+                      onChange={(e) => handleCodeAnswer(currentQ.questionVersionId, e.target.value, currentQ.config?.language || 'python')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab') {
+                          e.preventDefault();
+                          const start = e.target.selectionStart;
+                          const end = e.target.selectionEnd;
+                          const val = e.target.value;
+                          const next = val.substring(0, start) + '  ' + val.substring(end);
+                          handleCodeAnswer(currentQ.questionVersionId, next, currentQ.config?.language || 'python');
+                          setTimeout(() => {
+                            e.target.selectionStart = e.target.selectionEnd = start + 2;
+                          }, 0);
+                        }
+                      }}
+                      placeholder="// Write your solution code here..."
+                      className="w-full rounded-b-lg border border-t-0 border-line bg-slate-950 p-3 font-mono text-xs leading-relaxed text-emerald-400 focus:outline-none focus:ring-1 focus:ring-mark"
+                      spellCheck={false}
+                    />
+                  </div>
                 ) : (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-ink-soft">Type your answer below:</label>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="block text-xs font-medium text-ink-soft">
+                        {currentQ.typeCode === 'ESSAY' ? 'Write your essay answer:' : 'Type your answer below:'}
+                      </label>
+                      {/* Word count limits */}
+                      {(() => {
+                        const text = answers[currentQ.questionVersionId]?.text || '';
+                        const words = countWords(text);
+                        const minWords = currentQ.config?.minWords;
+                        const maxWords = currentQ.config?.maxWords || currentQ.config?.wordLimit;
+
+                        return (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className={`font-mono ${maxWords && words > maxWords ? 'font-bold text-pen' : 'text-ink-soft'}`}>
+                              Words: {words} {maxWords ? `/ ${maxWords} max` : ''}
+                            </span>
+                            {maxWords && words > maxWords && (
+                              <span className="rounded bg-pen-tint px-1.5 py-0.5 text-[10px] font-bold text-pen">
+                                Limit exceeded!
+                              </span>
+                            )}
+                            {minWords && words < minWords && (
+                              <span className="text-[10px] text-amber-600">
+                                (Min: {minWords})
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                     <textarea
-                      rows={5}
+                      rows={currentQ.typeCode === 'ESSAY' ? 10 : 5}
                       value={answers[currentQ.questionVersionId]?.text ?? ''}
                       onChange={(e) => handleTextAnswer(currentQ.questionVersionId, e.target.value)}
-                      placeholder="Write your explanation or answer here..."
-                      className="input"
+                      placeholder={currentQ.typeCode === 'ESSAY' ? 'Compose your structured essay response here...' : 'Write your explanation or answer here...'}
+                      className="input leading-relaxed"
                     />
                   </div>
                 )}

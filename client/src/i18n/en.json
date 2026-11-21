@@ -173,7 +173,19 @@
     "addCategoryQuick": "+ New Category",
     "noCategories": "No categories defined yet.",
     "archiveTitle": "Archive Question",
-    "deleteCategoryTitle": "Delete Category"
+    "deleteCategoryTitle": "Delete Category",
+    "types": {
+      "MCQ_SINGLE": "Single Choice (MCQ)",
+      "MCQ_MULTI": "Multiple Choice (MCQ)",
+      "TRUE_FALSE": "True / False",
+      "NUMERIC": "Numeric Answer",
+      "SHORT_TEXT": "Short Text",
+      "ESSAY": "Essay / Long Answer",
+      "MATCHING": "Matching (Pairs)",
+      "ORDERING": "Ordering (Sequence)",
+      "FILL_BLANK": "Fill in the Blanks",
+      "CODE": "Programming / Code"
+    }
   },
   "exams": {
     "title": "Exams Management",

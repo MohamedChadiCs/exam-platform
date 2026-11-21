@@ -154,11 +154,43 @@ export default function StudentResults() {
                   <div className="mt-2 text-sm font-medium text-ink whitespace-pre-wrap">{q.body_md}</div>
 
                   {/* Student Answer */}
-                  <div className="mt-2 rounded bg-paper p-2 text-xs text-ink-soft">
+                  <div className="mt-2 rounded bg-paper p-2.5 text-xs text-ink-soft">
                     <span className="font-semibold text-ink">Your answer:</span>{' '}
-                    {q.student_answer?.selectedOptionId ? '(Selected option)' :
-                     q.student_answer?.value !== undefined ? String(q.student_answer.value) :
-                     q.student_answer?.text ? String(q.student_answer.text) : '(No answer)'}
+                    {q.type_code === 'MATCHING' && q.student_answer?.matches ? (
+                      <div className="mt-1 space-y-1">
+                        {Object.entries(q.student_answer.matches).map(([k, v], i) => (
+                          <div key={i} className="font-mono text-ink">
+                            • {k} ⇄ {v}
+                          </div>
+                        ))}
+                      </div>
+                    ) : q.type_code === 'ORDERING' && (q.student_answer?.order || q.student_answer?.items) ? (
+                      <div className="mt-1">
+                        <ol className="list-decimal list-inside space-y-0.5 text-ink font-medium">
+                          {((q.student_answer.order || q.student_answer.items) || []).map((item, i) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : q.type_code === 'FILL_BLANK' && q.student_answer?.blanks ? (
+                      <div className="mt-1 space-y-1 text-ink font-mono">
+                        {Object.entries(q.student_answer.blanks).map(([k, v], i) => (
+                          <span key={i} className="me-3">Blank {k}: "{v}"</span>
+                        ))}
+                      </div>
+                    ) : q.type_code === 'CODE' && q.student_answer?.code ? (
+                      <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-xs text-emerald-300 whitespace-pre-wrap">
+                        {q.student_answer.code}
+                      </pre>
+                    ) : q.student_answer?.selectedOptionId ? (
+                      '(Selected option)'
+                    ) : q.student_answer?.value !== undefined ? (
+                      String(q.student_answer.value)
+                    ) : q.student_answer?.text ? (
+                      <span className="text-ink">{String(q.student_answer.text)}</span>
+                    ) : (
+                      '(No answer)'
+                    )}
                   </div>
 
                   {q.explanation_md && (
