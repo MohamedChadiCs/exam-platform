@@ -1,6 +1,15 @@
-// Thin fetch wrapper: same-origin cookies, CSRF header on writes, normalised errors.
+// Thin fetch wrapper: cookies + Bearer auth fallback, CSRF header on writes, normalised errors.
 let csrfToken = '';
 export const setCsrf = (t) => { csrfToken = t || ''; };
+
+let authToken = typeof window !== 'undefined' ? (localStorage.getItem('authToken') || '') : '';
+export const setAuthToken = (t) => {
+  authToken = t || '';
+  if (typeof window !== 'undefined') {
+    if (t) localStorage.setItem('authToken', t);
+    else localStorage.removeItem('authToken');
+  }
+};
 
 export class ApiError extends Error {
   constructor(status, code, message, details) { super(message); this.status = status; this.code = code; this.details = details; }
@@ -18,6 +27,7 @@ async function request(method, path, body) {
       headers: {
         ...(body !== undefined && { 'Content-Type': 'application/json' }),
         ...(method !== 'GET' && csrfToken && { 'X-CSRF-Token': csrfToken }),
+        ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });

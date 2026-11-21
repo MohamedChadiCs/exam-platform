@@ -123,11 +123,12 @@ export function createAuthRouter(limiters) {
           const token = await createSession(existingUser.id, req);
           await query('UPDATE users SET last_login_at = now() WHERE id=$1', [existingUser.id]);
           await audit({ actorId: existingUser.id, action: 'LOGIN', entityType: 'user', entityId: existingUser.id, ip: req.ip });
+          const isProd = env.NODE_ENV === 'production';
           res.cookie(SESSION_COOKIE, token, {
-            httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax',
+            httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax',
             maxAge: ABSOLUTE_HOURS * 3600_000, path: '/',
           });
-          return res.status(201).json({ success: true, data: { user: publicUser(existingUser), csrfToken: csrfTokenFor(sha256(token)) } });
+          return res.status(201).json({ success: true, data: { user: publicUser(existingUser), csrfToken: csrfTokenFor(sha256(token)), token } });
         }
       }
       throw new AppError(409, 'EMAIL_EXISTS', 'An account with this email already exists. Please log in.');
@@ -183,16 +184,23 @@ export function createAuthRouter(limiters) {
     const token = await createSession(u.id, req); // new id on every login: no session fixation
     await query('UPDATE users SET last_login_at = now() WHERE id=$1', [u.id]);
     await audit({ actorId: u.id, action: 'LOGIN', entityType: 'user', entityId: u.id, ip: req.ip });
+    const isProd = env.NODE_ENV === 'production';
     res.cookie(SESSION_COOKIE, token, {
-      httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax',
+      httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax',
       maxAge: ABSOLUTE_HOURS * 3600_000, path: '/',
     });
-    res.json({ success: true, data: { user: publicUser(u), csrfToken: csrfTokenFor(sha256(token)) } });
+    res.json({ success: true, data: { user: publicUser(u), csrfToken: csrfTokenFor(sha256(token)), token } });
   });
 
   r.post('/logout', requireAuth, async (req, res) => {
-    await revokeSession(req.cookies[SESSION_COOKIE]);
-    res.clearCookie(SESSION_COOKIE, { path: '/' });
+    const rawToken = req.cookies[SESSION_COOKIE] || req.get('authorization')?.replace(/^Bearer\s+/i, '');
+    if (rawToken) await revokeSession(rawToken);
+    const isProd = env.NODE_ENV === 'production';
+    res.clearCookie(SESSION_COOKIE, {
+      path: '/',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+    });
     res.json({ success: true, data: { message: 'Logged out' } });
   });
 

@@ -17,9 +17,11 @@ export function originCheck(req, _res, next) {
 
 export const csrfTokenFor = (idHash) => hmac(env.CSRF_SECRET, idHash.toString('hex'));
 
-/** Populates req.auth = { idHash, user } when a valid session cookie is present. */
+/** Populates req.auth = { idHash, user } when a valid session cookie or Bearer token is present. */
 export async function attachSession(req, _res, next) {
-  const token = req.cookies?.[SESSION_COOKIE];
+  const authHeader = req.get('authorization');
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const token = req.cookies?.[SESSION_COOKIE] || bearer;
   if (typeof token === 'string' && token.length > 20 && token.length < 200) {
     req.auth = await loadSession(token);
   }
