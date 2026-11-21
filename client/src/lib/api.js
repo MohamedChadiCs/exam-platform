@@ -6,11 +6,15 @@ export class ApiError extends Error {
   constructor(status, code, message, details) { super(message); this.status = status; this.code = code; this.details = details; }
 }
 
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1`
+  : '/api/v1';
+
 async function request(method, path, body) {
   let res;
   try {
-    res = await fetch(`/api/v1${path}`, {
-      method, credentials: 'same-origin',
+    res = await fetch(`${API_BASE}${path}`, {
+      method, credentials: 'include',
       headers: {
         ...(body !== undefined && { 'Content-Type': 'application/json' }),
         ...(method !== 'GET' && csrfToken && { 'X-CSRF-Token': csrfToken }),

@@ -6,7 +6,11 @@ import pg from 'pg';
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'db', 'migrations');
 
 export async function migrate(connectionString, log = () => {}) {
-  const client = new pg.Client({ connectionString });
+  const isRemote = connectionString && !connectionString.includes('localhost') && !connectionString.includes('127.0.0.1');
+  const client = new pg.Client({
+    connectionString,
+    ...(isRemote && { ssl: { rejectUnauthorized: false } }),
+  });
   await client.connect();
   try {
     await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (

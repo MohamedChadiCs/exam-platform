@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: exam-platform-api
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npm run db:migrate
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: TRUST_PROXY
+        value: 1
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CODE_PEPPER
+        sync: false
+      - key: CODE_ENC_KEY
+        sync: false
+      - key: CSRF_SECRET
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.ethereal.email
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_FROM
+        value: no-reply@exam-platform.local
