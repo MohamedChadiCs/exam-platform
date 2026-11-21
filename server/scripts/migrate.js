@@ -1,4 +1,9 @@
+import fs from 'node:fs';
 import { migrate } from '../src/lib/migrate.js';
+
+if (fs.existsSync('.env')) {
+  process.loadEnvFile?.('.env');
+}
 
 const connectionString = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 

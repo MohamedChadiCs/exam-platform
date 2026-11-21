@@ -1,5 +1,10 @@
+import fs from 'node:fs';
 import pg from 'pg';
 import argon2 from 'argon2';
+
+if (fs.existsSync('.env')) {
+  process.loadEnvFile?.('.env');
+}
 
 const isRemote = process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost') && !process.env.DATABASE_URL.includes('127.0.0.1');
 const db = new pg.Client({

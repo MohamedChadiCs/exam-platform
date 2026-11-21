@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.6"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "node --watch --env-file=.env src/server.js",
     "start": "node src/server.js",
     "keys": "node scripts/gen-keys.js",
-    "db:migrate": "node --env-file=.env scripts/migrate.js",
-    "db:seed": "node --env-file=.env scripts/seed.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "test": "node --env-file=.env --test --test-concurrency=1 \"test/**/*.test.js\""
   },
