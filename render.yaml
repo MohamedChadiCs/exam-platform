@@ -30,3 +30,17 @@ services:
         value: 587
       - key: SMTP_FROM
         value: no-reply@exam-platform.local
+
+  - type: static_site
+    name: exam-platform-frontend
+    plan: free
+    rootDir: client
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://exam-platform-sagh.onrender.com
