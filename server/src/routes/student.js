@@ -33,11 +33,7 @@ studentRouter.post('/exams/join', async (req, res) => {
   const ip = req.ip;
 
   const result = await withTx(async (db) => {
-    // 1. Fetch student profile (class_id)
-    const { rows: stRows } = await db.query(`SELECT class_id FROM students WHERE user_id = $1`, [studentId]);
-    const studentClassId = stRows[0]?.class_id;
-
-    // 2. Hash code and check access code
+    // 1. Hash code and check access code
     const codeHash = hashAccessCode(body.code);
     const qrHash = hashQrToken(body.code);
 
@@ -81,9 +77,15 @@ studentRouter.post('/exams/join', async (req, res) => {
       throw AppError.badRequest('This access code has reached its maximum uses');
     }
 
-    if (code.eligible_class_id && code.eligible_class_id !== studentClassId) {
-      await logAttempt('INELIGIBLE');
-      throw AppError.forbidden('This access code is restricted to a different academic class');
+    if (code.eligible_class_id) {
+      const { rows: enrRows } = await db.query(
+        `SELECT 1 FROM class_students WHERE student_id = $1 AND class_id = $2`,
+        [studentId, code.eligible_class_id]
+      );
+      if (!enrRows.length) {
+        await logAttempt('INELIGIBLE');
+        throw AppError.forbidden('This access code is restricted to a different academic class');
+      }
     }
 
     // Check existing enrollment

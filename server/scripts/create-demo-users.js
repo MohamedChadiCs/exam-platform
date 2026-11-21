@@ -51,12 +51,20 @@ await withTx(async (db) => {
   );
   const studentId = rows[0].id;
   await db.query(
-    `INSERT INTO students (user_id, matricule, class_id)
-     VALUES ($1, 'ST-2026-001', $2)
+    `INSERT INTO students (user_id, matricule)
+     VALUES ($1, 'ST-2026-001')
      ON CONFLICT (user_id)
-     DO UPDATE SET matricule = 'ST-2026-001', class_id = EXCLUDED.class_id`,
-    [studentId, classId]
+     DO UPDATE SET matricule = 'ST-2026-001'`,
+    [studentId]
   );
+  if (classId) {
+    await db.query(
+      `INSERT INTO class_students (class_id, student_id)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [classId, studentId]
+    );
+  }
   console.log(`Student created/updated: ${studentEmail}`);
 });
 

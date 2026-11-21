@@ -84,18 +84,19 @@ academicRouter.get('/classes', async (req, res) => {
   const ownerFilter = (mine === 'true' && req.auth?.user?.id) ? req.auth.user.id : null;
 
   const { rows } = await query(
-    `SELECT ac.id, ac.department_id, ac.name, ac.academic_year, ac.owner_id,
+    `SELECT ac.id, ac.department_id, ac.name, ac.academic_year, ac.teacher_id, ac.teacher_id AS owner_id,
             ac.invite_code, ac.created_at,
             d.name AS department_name,
             u.first_name || ' ' || u.last_name AS owner_name,
+            u.first_name || ' ' || u.last_name AS teacher_name,
             (SELECT count(*)::int FROM class_students WHERE class_id = ac.id) AS student_count,
             (SELECT count(*)::int FROM class_courses WHERE class_id = ac.id) AS course_count
        FROM academic_classes ac
        LEFT JOIN departments d ON d.id = ac.department_id
-       LEFT JOIN users u ON u.id = ac.owner_id
+       LEFT JOIN users u ON u.id = ac.teacher_id
       WHERE ac.archived_at IS NULL
         AND ($1::uuid IS NULL OR ac.department_id = $1)
-        AND ($2::uuid IS NULL OR ac.owner_id = $2)
+        AND ($2::uuid IS NULL OR ac.teacher_id = $2)
       ORDER BY ac.academic_year DESC, ac.name`,
     [departmentId ?? null, ownerFilter]
   );
@@ -106,13 +107,14 @@ academicRouter.get('/classes/:id', requireAuth, async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
 
   const { rows: classRows } = await query(
-    `SELECT ac.id, ac.department_id, ac.name, ac.academic_year, ac.owner_id,
+    `SELECT ac.id, ac.department_id, ac.name, ac.academic_year, ac.teacher_id, ac.teacher_id AS owner_id,
             ac.invite_code, ac.created_at,
             d.name AS department_name,
-            u.first_name || ' ' || u.last_name AS owner_name
+            u.first_name || ' ' || u.last_name AS owner_name,
+            u.first_name || ' ' || u.last_name AS teacher_name
        FROM academic_classes ac
        LEFT JOIN departments d ON d.id = ac.department_id
-       LEFT JOIN users u ON u.id = ac.owner_id
+       LEFT JOIN users u ON u.id = ac.teacher_id
       WHERE ac.id = $1 AND ac.archived_at IS NULL`,
     [id]
   );
@@ -163,21 +165,21 @@ academicRouter.post('/classes', ...professorOrAdmin, async (req, res) => {
   let rows;
   if (deptId) {
     const res = await query(
-      `INSERT INTO academic_classes (department_id, name, academic_year, owner_id, invite_code)
+      `INSERT INTO academic_classes (department_id, name, academic_year, teacher_id, invite_code)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (department_id, name, academic_year) DO UPDATE
          SET archived_at = NULL,
              invite_code = COALESCE(academic_classes.invite_code, EXCLUDED.invite_code),
-             owner_id = COALESCE(academic_classes.owner_id, EXCLUDED.owner_id)
-       RETURNING id, department_id, name, academic_year, owner_id, invite_code, created_at`,
+             teacher_id = COALESCE(academic_classes.teacher_id, EXCLUDED.teacher_id)
+       RETURNING id, department_id, name, academic_year, teacher_id, teacher_id AS owner_id, invite_code, created_at`,
       [deptId, body.name, body.academicYear, ownerId, inviteCode]
     );
     rows = res.rows;
   } else {
     const res = await query(
-      `INSERT INTO academic_classes (department_id, name, academic_year, owner_id, invite_code)
+      `INSERT INTO academic_classes (department_id, name, academic_year, teacher_id, invite_code)
        VALUES (NULL, $1, $2, $3, $4)
-       RETURNING id, department_id, name, academic_year, owner_id, invite_code, created_at`,
+       RETURNING id, department_id, name, academic_year, teacher_id, teacher_id AS owner_id, invite_code, created_at`,
       [body.name, body.academicYear, ownerId, inviteCode]
     );
     rows = res.rows;
@@ -198,8 +200,8 @@ academicRouter.put('/classes/:id', ...professorOrAdmin, async (req, res) => {
   const { rows } = await query(
     `UPDATE academic_classes
         SET name = $2, academic_year = $3, department_id = COALESCE($4, department_id)
-      WHERE id = $1 AND ($5 = 'ADMIN' OR owner_id = $6) AND archived_at IS NULL
-      RETURNING id, department_id, name, academic_year, owner_id, invite_code`,
+      WHERE id = $1 AND ($5 = 'ADMIN' OR teacher_id = $6) AND archived_at IS NULL
+      RETURNING id, department_id, name, academic_year, teacher_id, teacher_id AS owner_id, invite_code`,
     [id, body.name, body.academicYear, body.departmentId ?? null, req.auth.user.role, req.auth.user.id]
   );
   if (!rows[0]) throw AppError.notFound('Class not found or unauthorized');
@@ -211,7 +213,7 @@ academicRouter.delete('/classes/:id', ...professorOrAdmin, async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
   const { rowCount } = await query(
     `UPDATE academic_classes SET archived_at = now()
-      WHERE id = $1 AND ($2 = 'ADMIN' OR owner_id = $3) AND archived_at IS NULL`,
+      WHERE id = $1 AND ($2 = 'ADMIN' OR teacher_id = $3) AND archived_at IS NULL`,
     [id, req.auth.user.role, req.auth.user.id]
   );
   if (!rowCount) throw AppError.notFound('Class not found or unauthorized');
@@ -226,7 +228,7 @@ academicRouter.post('/classes/:id/invite', ...professorOrAdmin, async (req, res)
 
   // Check class exists and owned by professor or admin
   const { rows: clsRows } = await query(
-    `SELECT id, name FROM academic_classes WHERE id = $1 AND archived_at IS NULL AND ($2 = 'ADMIN' OR owner_id = $3)`,
+    `SELECT id, name FROM academic_classes WHERE id = $1 AND archived_at IS NULL AND ($2 = 'ADMIN' OR teacher_id = $3)`,
     [id, req.auth.user.role, req.auth.user.id]
   );
   if (!clsRows[0]) throw AppError.notFound('Class not found or unauthorized');
@@ -247,12 +249,6 @@ academicRouter.post('/classes/:id/invite', ...professorOrAdmin, async (req, res)
     `INSERT INTO class_students (class_id, student_id)
      VALUES ($1, $2)
      ON CONFLICT DO NOTHING`,
-    [id, student.user_id]
-  );
-
-  // Update default class_id on student profile if empty
-  await query(
-    `UPDATE students SET class_id = $1 WHERE user_id = $2 AND class_id IS NULL`,
     [id, student.user_id]
   );
 
@@ -277,7 +273,7 @@ academicRouter.delete('/classes/:id/students/:studentId', ...professorOrAdmin, a
 
   // Check authorization
   const { rows: clsRows } = await query(
-    `SELECT id FROM academic_classes WHERE id = $1 AND archived_at IS NULL AND ($2 = 'ADMIN' OR owner_id = $3)`,
+    `SELECT id FROM academic_classes WHERE id = $1 AND archived_at IS NULL AND ($2 = 'ADMIN' OR teacher_id = $3)`,
     [id, req.auth.user.role, req.auth.user.id]
   );
   if (!clsRows[0]) throw AppError.notFound('Class not found or unauthorized');
@@ -306,7 +302,7 @@ academicRouter.post('/classes/:id/courses', ...professorOrAdmin, async (req, res
   const { courseId } = z.object({ courseId: z.string().uuid() }).parse(req.body);
 
   const { rows: clsRows } = await query(
-    `SELECT id FROM academic_classes WHERE id = $1 AND archived_at IS NULL AND ($2 = 'ADMIN' OR owner_id = $3)`,
+    `SELECT id FROM academic_classes WHERE id = $1 AND archived_at IS NULL AND ($2 = 'ADMIN' OR teacher_id = $3)`,
     [id, req.auth.user.role, req.auth.user.id]
   );
   if (!clsRows[0]) throw AppError.notFound('Class not found or unauthorized');
@@ -327,7 +323,7 @@ academicRouter.delete('/classes/:id/courses/:courseId', ...professorOrAdmin, asy
   }).parse(req.params);
 
   const { rows: clsRows } = await query(
-    `SELECT id FROM academic_classes WHERE id = $1 AND archived_at IS NULL AND ($2 = 'ADMIN' OR owner_id = $3)`,
+    `SELECT id FROM academic_classes WHERE id = $1 AND archived_at IS NULL AND ($2 = 'ADMIN' OR teacher_id = $3)`,
     [id, req.auth.user.role, req.auth.user.id]
   );
   if (!clsRows[0]) throw AppError.notFound('Class not found or unauthorized');
@@ -347,7 +343,7 @@ academicRouter.post('/classes/join', ...studentOnly, async (req, res) => {
   }).parse(req.body);
 
   const { rows: clsRows } = await query(
-    `SELECT id, name, academic_year, owner_id FROM academic_classes
+    `SELECT id, name, academic_year, teacher_id, teacher_id AS owner_id FROM academic_classes
       WHERE UPPER(invite_code) = UPPER($1) AND archived_at IS NULL`,
     [inviteCode]
   );
@@ -358,11 +354,6 @@ academicRouter.post('/classes/join', ...studentOnly, async (req, res) => {
     `INSERT INTO class_students (class_id, student_id)
      VALUES ($1, $2)
      ON CONFLICT DO NOTHING`,
-    [cls.id, req.auth.user.id]
-  );
-
-  await query(
-    `UPDATE students SET class_id = $1 WHERE user_id = $2 AND class_id IS NULL`,
     [cls.id, req.auth.user.id]
   );
 
@@ -395,7 +386,7 @@ academicRouter.get('/student/classes', ...studentOnly, async (req, res) => {
        FROM class_students cs
        JOIN academic_classes ac ON ac.id = cs.class_id
        LEFT JOIN departments d ON d.id = ac.department_id
-       LEFT JOIN users u ON u.id = ac.owner_id
+       LEFT JOIN users u ON u.id = ac.teacher_id
       WHERE cs.student_id = $1 AND ac.archived_at IS NULL
       ORDER BY cs.enrolled_at DESC`,
     [req.auth.user.id]
@@ -416,7 +407,7 @@ academicRouter.get('/courses', async (req, res) => {
   const ownerFilter = (mine === 'true' && req.auth?.user?.id) ? req.auth.user.id : null;
 
   const { rows } = await query(
-    `SELECT c.id, c.department_id, c.code, c.name, c.owner_id, d.name AS department_name,
+    `SELECT c.id, c.department_id, c.code, c.name, c.teacher_id, c.teacher_id AS owner_id, d.name AS department_name,
             u.first_name || ' ' || u.last_name AS professor_name,
             COALESCE(
               (SELECT json_agg(json_build_object('id', ac.id, 'name', ac.name, 'academic_year', ac.academic_year))
@@ -427,10 +418,10 @@ academicRouter.get('/courses', async (req, res) => {
             ) AS assigned_classes
        FROM courses c
        LEFT JOIN departments d ON d.id = c.department_id
-       LEFT JOIN users u ON u.id = c.owner_id
+       LEFT JOIN users u ON u.id = c.teacher_id
       WHERE c.archived_at IS NULL
         AND ($1::uuid IS NULL OR c.department_id = $1)
-        AND ($2::uuid IS NULL OR c.owner_id = $2 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = c.id AND professor_id = $2))
+        AND ($2::uuid IS NULL OR c.teacher_id = $2 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = c.id AND professor_id = $2))
       ORDER BY c.code, c.name`,
     [departmentId ?? null, ownerFilter]
   );
@@ -457,18 +448,18 @@ academicRouter.post('/courses', ...professorOrAdmin, async (req, res) => {
     let courseRow;
     if (deptId) {
       const { rows } = await db.query(
-        `INSERT INTO courses (department_id, code, name, owner_id)
+        `INSERT INTO courses (department_id, code, name, teacher_id)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (department_id, code) DO UPDATE SET name = EXCLUDED.name, archived_at = NULL
-         RETURNING id, department_id, code, name, owner_id`,
+         RETURNING id, department_id, code, name, teacher_id, teacher_id AS owner_id`,
         [deptId, body.code, body.name, ownerId]
       );
       courseRow = rows[0];
     } else {
       const { rows } = await db.query(
-        `INSERT INTO courses (code, name, owner_id)
+        `INSERT INTO courses (code, name, teacher_id)
          VALUES ($1, $2, $3)
-         RETURNING id, department_id, code, name, owner_id`,
+         RETURNING id, department_id, code, name, teacher_id, teacher_id AS owner_id`,
         [body.code, body.name, ownerId]
       );
       courseRow = rows[0];
@@ -524,8 +515,8 @@ academicRouter.put('/courses/:id', ...professorOrAdmin, async (req, res) => {
     const { rows } = await db.query(
       `UPDATE courses
           SET code = $2, name = $3, department_id = COALESCE($4, department_id)
-        WHERE id = $1 AND ($5 = 'ADMIN' OR owner_id = $6 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = $1 AND professor_id = $6))
-        RETURNING id, department_id, code, name`,
+        WHERE id = $1 AND ($5 = 'ADMIN' OR teacher_id = $6 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = $1 AND professor_id = $6))
+        RETURNING id, department_id, code, name, teacher_id, teacher_id AS owner_id`,
       [id, body.code, body.name, body.departmentId ?? null, req.auth.user.role, req.auth.user.id]
     );
     if (!rows[0]) throw AppError.notFound('Course not found or unauthorized');
@@ -549,7 +540,7 @@ academicRouter.delete('/courses/:id', ...professorOrAdmin, async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
   const { rowCount } = await query(
     `UPDATE courses SET archived_at = now()
-      WHERE id = $1 AND ($2 = 'ADMIN' OR owner_id = $3 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = $1 AND professor_id = $3))`,
+      WHERE id = $1 AND ($2 = 'ADMIN' OR teacher_id = $3 OR EXISTS (SELECT 1 FROM course_professors WHERE course_id = $1 AND professor_id = $3))`,
     [id, req.auth.user.role, req.auth.user.id]
   );
   if (!rowCount) throw AppError.notFound('Course not found or unauthorized');

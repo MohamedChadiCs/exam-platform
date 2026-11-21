@@ -28,7 +28,10 @@ async function createStudent(email = 'student@test.local', password = 'Student-P
      VALUES ($1, $2, 3, 'ACTIVE', 'Ada', 'Lovelace', now()) RETURNING id`,
     [email, hash]
   );
-  await query(`INSERT INTO students (user_id, matricule, class_id) VALUES ($1, $2, $3)`, [rows[0].id, `ST-${Date.now()}`, classId]);
+  await query(`INSERT INTO students (user_id, matricule) VALUES ($1, $2)`, [rows[0].id, `ST-${Date.now()}`]);
+  if (classId) {
+    await query(`INSERT INTO class_students (class_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [classId, rows[0].id]);
+  }
   return { id: rows[0].id, email, password };
 }
 
@@ -300,7 +303,7 @@ test('Teacher Class & Course Management: Create class, invite students, create c
     assert.equal(createClassRes.status, 201);
     const cls = createClassRes.body.data;
     assert.ok(cls.invite_code.startsWith('CLS-'));
-    assert.equal(cls.owner_id, prof.id);
+    assert.equal(cls.teacher_id, prof.id);
 
     // 2. Teacher creates a course and assigns it to the class
     const createCourseRes = await cProf.post('/academic/courses', {

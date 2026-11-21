@@ -65,8 +65,12 @@ export function createAuthRouter(limiters) {
           [d.email, hash, d.role, d.firstName, d.lastName, d.locale]);
         const id = rows[0].id;
         if (d.role === 'STUDENT') {
-          await db.query('INSERT INTO students(user_id,matricule,class_id) VALUES ($1,$2,$3)',
-            [id, d.matricule, d.classId ?? null]);
+          await db.query('INSERT INTO students(user_id,matricule) VALUES ($1,$2)',
+            [id, d.matricule]);
+          if (d.classId) {
+            await db.query('INSERT INTO class_students(class_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+              [d.classId, id]);
+          }
         } else {
           await db.query('INSERT INTO professors(user_id,department_id,title) VALUES ($1,$2,$3)',
             [id, d.departmentId ?? null, d.title ?? null]);
