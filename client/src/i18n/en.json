@@ -331,7 +331,8 @@
     "UNAUTHORIZED": "Please log in.",
     "BAD_REQUEST": "This link or request is invalid.",
     "CSRF_INVALID": "Session expired. Reload the page.",
-    "GENERIC": "Something went wrong."
+    "GENERIC": "Something went wrong.",
+    "EMAIL_EXISTS": "An account with this email already exists. Please log in."
   },
   "suspendedReason": "Reason: {{reason}}",
   "suspendedUntil": "Until {{date}}"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import AuthLayout from '../layouts/AuthLayout';
 import Field from '../components/Field';
@@ -10,7 +10,7 @@ import { useAuth } from '../lib/AuthContext';
 
 export default function Register() {
   const { t, i18n } = useTranslation();
-  const { setSession } = useAuth();
+  const { user, setSession } = useAuth();
   const navigate = useNavigate();
   const [role, setRole] = useState('STUDENT');
   const [f, setF] = useState({ firstName: '', lastName: '', email: '', password: '', matricule: '', departmentId: '', classId: '', title: '' });
@@ -27,6 +27,8 @@ export default function Register() {
     setClasses([]);
     if (f.departmentId) api.get(`/academic/classes?departmentId=${f.departmentId}`).then(setClasses).catch(() => {});
   }, [f.departmentId]);
+
+  if (user) return <Navigate to="/app" replace />;
 
   async function submit(e) {
     e.preventDefault(); setError(null); setFields({}); setBusy(true);

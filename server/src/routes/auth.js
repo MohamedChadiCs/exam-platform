@@ -97,15 +97,40 @@ export function createAuthRouter(limiters) {
       });
     }
     // Auto-login for professors: create session and set cookie
-    if (isProfessor && newUser) {
-      const token = await createSession(newUser.id, req);
-      await query('UPDATE users SET last_login_at = now() WHERE id=$1', [newUser.id]);
-      await audit({ actorId: newUser.id, action: 'LOGIN', entityType: 'user', entityId: newUser.id, ip: req.ip });
-      res.cookie(SESSION_COOKIE, token, {
-        httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax',
-        maxAge: ABSOLUTE_HOURS * 3600_000, path: '/',
-      });
-      return res.status(201).json({ success: true, data: { user: publicUser(newUser), csrfToken: csrfTokenFor(sha256(token)) } });
+    if (isProfessor) {
+      if (newUser) {
+        const token = await createSession(newUser.id, req);
+        await query('UPDATE users SET last_login_at = now() WHERE id=$1', [newUser.id]);
+        await audit({ actorId: newUser.id, action: 'LOGIN', entityType: 'user', entityId: newUser.id, ip: req.ip });
+        res.cookie(SESSION_COOKIE, token, {
+          httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax',
+          maxAge: ABSOLUTE_HOURS * 3600_000, path: '/',
+        });
+        return res.status(201).json({ success: true, data: { user: publicUser(newUser), csrfToken: csrfTokenFor(sha256(token)) } });
+      }
+      // If email already existed: check if this is the professor logging in with their password
+      const { rows: existingRows } = await query(
+        `SELECT u.*, r.code AS role FROM users u JOIN roles r ON r.id=u.role_id WHERE lower(u.email)=$1`, [d.email]
+      );
+      const existingUser = existingRows[0];
+      if (existingUser && existingUser.role === 'PROFESSOR') {
+        const passwordOk = await argon2.verify(existingUser.password_hash, d.password).catch(() => false);
+        if (passwordOk && (existingUser.status === 'ACTIVE' || existingUser.status === 'PENDING_EMAIL')) {
+          if (existingUser.status === 'PENDING_EMAIL') {
+            await query(`UPDATE users SET status='ACTIVE', email_verified_at=COALESCE(email_verified_at, now()), updated_at=now() WHERE id=$1`, [existingUser.id]);
+            existingUser.status = 'ACTIVE';
+          }
+          const token = await createSession(existingUser.id, req);
+          await query('UPDATE users SET last_login_at = now() WHERE id=$1', [existingUser.id]);
+          await audit({ actorId: existingUser.id, action: 'LOGIN', entityType: 'user', entityId: existingUser.id, ip: req.ip });
+          res.cookie(SESSION_COOKIE, token, {
+            httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax',
+            maxAge: ABSOLUTE_HOURS * 3600_000, path: '/',
+          });
+          return res.status(201).json({ success: true, data: { user: publicUser(existingUser), csrfToken: csrfTokenFor(sha256(token)) } });
+        }
+      }
+      throw new AppError(409, 'EMAIL_EXISTS', 'An account with this email already exists. Please log in.');
     }
     res.status(202).json({ success: true, data: GENERIC_REGISTER_STUDENT });
   });
@@ -141,6 +166,11 @@ export function createAuthRouter(limiters) {
     if (u.status === 'SUSPENDED' && u.suspended_until && u.suspended_until <= new Date()) {
       await query(`UPDATE users SET status='ACTIVE', suspended_at=NULL, suspended_until=NULL,
                    suspension_reason=NULL, updated_at=now() WHERE id=$1`, [u.id]);
+      u = { ...u, status: 'ACTIVE' };
+    }
+    // Professors never require email verification — auto-activate if needed
+    if (u.role === 'PROFESSOR' && u.status === 'PENDING_EMAIL') {
+      await query(`UPDATE users SET status='ACTIVE', email_verified_at=COALESCE(email_verified_at, now()), updated_at=now() WHERE id=$1`, [u.id]);
       u = { ...u, status: 'ACTIVE' };
     }
     if (u.status === 'PENDING_EMAIL') throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Please verify your email first');

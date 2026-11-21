@@ -91,8 +91,15 @@ describe('register', () => {
   });
   it('professor form has no matricule and sends no student fields', async () => {
     const profUser = meOf('PROFESSOR');
-    const calls = mockApi({ 'GET /auth/me': () => profUser, 'GET /academic/departments': depts,
-      'POST /auth/register': { status: 201, body: { success: true, data: profUser } } });
+    let authed = false;
+    const calls = mockApi({
+      'GET /auth/me': () => (authed ? profUser : unauth),
+      'GET /academic/departments': depts,
+      'POST /auth/register': () => {
+        authed = true;
+        return { status: 201, body: { success: true, data: profUser } };
+      },
+    });
     renderApp('/register');
     await userEvent.click(await screen.findByLabelText('Professeur'));
     expect(screen.queryByLabelText('Matricule')).toBeNull();
