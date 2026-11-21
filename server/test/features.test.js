@@ -281,3 +281,69 @@ test('Category Hierarchy: Parent category filters all descendant questions recur
     await app.close();
   }
 });
+
+test('Teacher Class & Course Management: Create class, invite students, create course and assign to class', async () => {
+  const app = await startApp();
+  try {
+    const prof = await createProfessor('teacher.class@test.local', 'Teacher-Pass-123');
+    const student1 = await createStudent('alice@test.local', 'Alice-Pass-123');
+    const student2 = await createStudent('bob@test.local', 'Bob-Pass-123');
+
+    const cProf = client(app.url);
+    await cProf.login(prof.email, prof.password);
+
+    // 1. Teacher creates their own class
+    const createClassRes = await cProf.post('/academic/classes', {
+      name: 'Software Engineering A',
+      academicYear: '2026/2027',
+    });
+    assert.equal(createClassRes.status, 201);
+    const cls = createClassRes.body.data;
+    assert.ok(cls.invite_code.startsWith('CLS-'));
+    assert.equal(cls.owner_id, prof.id);
+
+    // 2. Teacher creates a course and assigns it to the class
+    const createCourseRes = await cProf.post('/academic/courses', {
+      code: 'SE301',
+      name: 'Software Architecture',
+      classIds: [cls.id],
+    });
+    assert.equal(createCourseRes.status, 201);
+    const course = createCourseRes.body.data;
+
+    // 3. Teacher invites student 1 by email directly
+    const inviteRes = await cProf.post(`/academic/classes/${cls.id}/invite`, {
+      identifier: student1.email,
+    });
+    assert.equal(inviteRes.status, 201);
+    assert.equal(inviteRes.body.data.email, student1.email);
+
+    // 4. Student 2 joins the class using the class invite code
+    const cStudent2 = client(app.url);
+    await cStudent2.login(student2.email, student2.password);
+    const joinRes = await cStudent2.post('/academic/classes/join', {
+      inviteCode: cls.invite_code,
+    });
+    assert.equal(joinRes.status, 200);
+    assert.equal(joinRes.body.data.id, cls.id);
+
+    // 5. Teacher checks class details -> both students and the course are listed
+    const classDetails = await cProf.get(`/academic/classes/${cls.id}`);
+    assert.equal(classDetails.status, 200);
+    assert.equal(classDetails.body.data.students.length, 2);
+    assert.ok(classDetails.body.data.students.some((s) => s.email === student1.email));
+    assert.ok(classDetails.body.data.students.some((s) => s.email === student2.email));
+    assert.equal(classDetails.body.data.courses.length, 1);
+    assert.equal(classDetails.body.data.courses[0].id, course.id);
+
+    // 6. Student 2 checks their enrolled classes
+    const studentClasses = await cStudent2.get('/academic/student/classes');
+    assert.equal(studentClasses.status, 200);
+    assert.equal(studentClasses.body.data.length, 1);
+    assert.equal(studentClasses.body.data[0].id, cls.id);
+    assert.equal(studentClasses.body.data[0].courses.length, 1);
+    assert.equal(studentClasses.body.data[0].courses[0].code, 'SE301');
+  } finally {
+    await app.close();
+  }
+});

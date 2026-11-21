@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Users, Building, HelpCircle, FileText, KeyRound, Play, Award, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Building, HelpCircle, FileText, KeyRound, Play, Award, LogOut, BookOpen } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import LangSwitch from '../components/LangSwitch';
 
@@ -15,10 +15,13 @@ export default function AppShell() {
       { to: '/app/admin/academic', icon: Building, label: t('admin.academic', 'Academic Management') },
     ] : []),
     ...(user.role === 'PROFESSOR' ? [
+      { to: '/app/classes', icon: Users, label: t('dashboard.mClasses', 'My Classes') },
+      { to: '/app/courses', icon: BookOpen, label: t('dashboard.mCourses', 'Courses') },
       { to: '/app/questions', icon: HelpCircle, label: t('dashboard.mQuestions', 'Question Bank') },
       { to: '/app/exams', icon: FileText, label: t('dashboard.mExams', 'Exams') },
     ] : []),
     ...(user.role === 'STUDENT' ? [
+      { to: '/app/student/classes', icon: Users, label: t('dashboard.mMyClasses', 'My Classes') },
       { to: '/app/exams/join', icon: KeyRound, label: t('dashboard.mJoin', 'Join Exam') },
       { to: '/app/exams/take', icon: Play, label: t('dashboard.mTake', 'My Exams') },
       { to: '/app/results', icon: Award, label: t('dashboard.mResults', 'Results') },

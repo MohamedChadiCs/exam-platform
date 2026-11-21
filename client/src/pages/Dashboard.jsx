@@ -8,11 +8,14 @@ const MODULES = {
     { k: 'mAcademic', to: '/app/admin/academic' },
   ],
   PROFESSOR: [
+    { k: 'mClasses', to: '/app/classes' },
+    { k: 'mCourses', to: '/app/courses' },
     { k: 'mQuestions', to: '/app/questions' },
     { k: 'mExams', to: '/app/exams' },
     { k: 'mCodes' },
   ],
   STUDENT: [
+    { k: 'mMyClasses', to: '/app/student/classes' },
     { k: 'mJoin', to: '/app/exams/join' },
     { k: 'mTake', to: '/app/exams/take' },
     { k: 'mResults', to: '/app/results' },

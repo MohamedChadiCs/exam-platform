@@ -18,6 +18,9 @@ import JoinExam from './pages/JoinExam';
 import StudentExams from './pages/StudentExams';
 import TakeExam from './pages/TakeExam';
 import StudentResults from './pages/StudentResults';
+import TeacherClasses from './pages/TeacherClasses';
+import Courses from './pages/Courses';
+import StudentClasses from './pages/StudentClasses';
 
 // UX-only guards. The API enforces every permission again on the server.
 function Protected({ roles, children }) {
@@ -43,12 +46,15 @@ export default function App() {
         <Route path="admin/users" element={<Protected roles={['ADMIN']}><AdminUsers /></Protected>} />
         <Route path="admin/academic" element={<Protected roles={['ADMIN']}><AdminAcademic /></Protected>} />
         {/* Professor Routes */}
+        <Route path="classes" element={<Protected roles={['PROFESSOR', 'ADMIN']}><TeacherClasses /></Protected>} />
+        <Route path="courses" element={<Protected roles={['PROFESSOR', 'ADMIN']}><Courses /></Protected>} />
         <Route path="questions" element={<Protected roles={['PROFESSOR', 'ADMIN']}><Questions /></Protected>} />
         <Route path="exams" element={<Protected roles={['PROFESSOR', 'ADMIN']}><Exams /></Protected>} />
         <Route path="exams/new" element={<Protected roles={['PROFESSOR', 'ADMIN']}><ExamPaperEditor /></Protected>} />
         <Route path="exams/:id/edit" element={<Protected roles={['PROFESSOR', 'ADMIN']}><ExamPaperEditor /></Protected>} />
         <Route path="exams/:id/submissions" element={<Protected roles={['PROFESSOR', 'ADMIN']}><ExamSubmissions /></Protected>} />
         {/* Student Routes */}
+        <Route path="student/classes" element={<Protected roles={['STUDENT']}><StudentClasses /></Protected>} />
         <Route path="exams/join" element={<Protected roles={['STUDENT']}><JoinExam /></Protected>} />
         <Route path="exams/take" element={<Protected roles={['STUDENT']}><StudentExams /></Protected>} />
         <Route path="exam-session/:sessionId" element={<Protected roles={['STUDENT']}><TakeExam /></Protected>} />
