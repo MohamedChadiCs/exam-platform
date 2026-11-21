@@ -1,7 +1,11 @@
 import pg from 'pg';
 import argon2 from 'argon2';
 
-const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+const isRemote = process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost') && !process.env.DATABASE_URL.includes('127.0.0.1');
+const db = new pg.Client({
+  connectionString: process.env.DATABASE_URL,
+  ...(isRemote && { ssl: { rejectUnauthorized: false } }),
+});
 const isProd = process.env.NODE_ENV === 'production';
 
 const QUESTION_TYPES = ['MCQ_SINGLE','MCQ_MULTI','TRUE_FALSE','NUMERIC','SHORT_TEXT','LONG_TEXT','FILL_BLANK','MATCHING','ORDERING'];
