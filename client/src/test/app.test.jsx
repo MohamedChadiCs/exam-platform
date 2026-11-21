@@ -5,14 +5,14 @@ import i18n from '../i18n';
 import { mockApi, unauth, meOf, renderApp } from './utils';
 
 describe('i18n and direction', () => {
-  it('French/LTR by default, Arabic switches to RTL with Arabic text', async () => {
+  it('keeps LTR layout with Arabic text when switching language', async () => {
     mockApi({ 'GET /auth/me': unauth });
     renderApp('/login');
     expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument();
     expect(document.documentElement.dir).toBe('ltr');
     await userEvent.selectOptions(screen.getAllByLabelText('Langue')[0], 'ar');
     expect(await screen.findByRole('heading', { name: 'تسجيل الدخول' })).toBeInTheDocument();
-    expect(document.documentElement.dir).toBe('rtl');
+    expect(document.documentElement.dir).toBe('ltr');
     expect(document.documentElement.lang).toBe('ar');
     await i18n.changeLanguage('fr');
     expect(document.documentElement.dir).toBe('ltr');

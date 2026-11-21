@@ -10,7 +10,7 @@ const initial = saved in LANGS ? saved : 'fr';
 
 export function applyDirection(lang) {
   document.documentElement.lang = lang;
-  document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  document.documentElement.dir = 'ltr';
 }
 
 i18n.use(initReactI18next).init({
