@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { errorText } from '../lib/errors';
 import Alert from '../components/Alert';
 import Field from '../components/Field';
+import { useConfirm } from '../lib/ConfirmContext';
 
 const STATUS_STYLE = {
   ACTIVE: 'bg-ok-tint text-ok', SUSPENDED: 'bg-pen-tint text-pen',
@@ -13,6 +14,7 @@ const STATUS_STYLE = {
 
 export default function AdminUsers() {
   const { t, i18n } = useTranslation();
+  const confirm = useConfirm();
   const [filters, setFilters] = useState({ role: '', status: '', q: '' });
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
@@ -84,7 +86,15 @@ export default function AdminUsers() {
                         <button className="btn-quiet !px-3 !py-1.5" onClick={() => act(`/admin/professors/${u.id}/verify`)}>{t('admin.verify')}</button>}
                       {u.status !== 'ARCHIVED' &&
                         <button className="btn-quiet !px-3 !py-1.5 text-pen"
-                          onClick={() => window.confirm(t('admin.archiveConfirm')) && act(`/admin/users/${u.id}/archive`)}>{t('admin.archive')}</button>}
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: t('admin.archiveTitle', 'Archive User'),
+                              message: t('admin.archiveConfirm'),
+                              confirmLabel: t('admin.archive', 'Archive'),
+                              variant: 'danger',
+                            });
+                            if (ok) act(`/admin/users/${u.id}/archive`);
+                          }}>{t('admin.archive')}</button>}
                     </div>)}
                 </td>
               </tr>))}

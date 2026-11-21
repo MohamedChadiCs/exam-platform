@@ -6,9 +6,11 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import { useConfirm } from '../lib/ConfirmContext';
 
 export default function TeacherClasses() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [classes, setClasses] = useState([]);
   const [allCourses, setAllCourses] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -127,7 +129,13 @@ export default function TeacherClasses() {
 
   async function handleDeleteClass(cls, e) {
     e.stopPropagation();
-    if (!confirm(t('classes.deleteConfirm', 'Archive this class? Students will no longer see it.'))) return;
+    const ok = await confirm({
+      title: t('classes.archiveTitle', 'Archive Class'),
+      message: t('classes.deleteConfirm', 'Archive this class? Students will no longer see it.'),
+      confirmLabel: t('classes.archive', 'Archive'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/academic/classes/${cls.id}`);
       setSuccessMsg(t('classes.archivedSuccess', 'Class archived successfully.'));
@@ -143,7 +151,13 @@ export default function TeacherClasses() {
 
   async function handleRestoreClass(cls, e) {
     e.stopPropagation();
-    if (!confirm(t('classes.restoreConfirm', 'Restore this archived class?'))) return;
+    const ok = await confirm({
+      title: t('classes.restoreTitle', 'Restore Class'),
+      message: t('classes.restoreConfirm', 'Restore this archived class?'),
+      confirmLabel: t('classes.restore', 'Restore'),
+      variant: 'primary',
+    });
+    if (!ok) return;
     try {
       await api.post(`/academic/classes/${cls.id}/restore`);
       setSuccessMsg(t('classes.restoredSuccess', 'Class restored successfully.'));
@@ -179,7 +193,13 @@ export default function TeacherClasses() {
   }
 
   async function handleRemoveStudent(studentId) {
-    if (!confirm(t('classes.removeStudentConfirm', 'Remove this student from the class?'))) return;
+    const ok = await confirm({
+      title: t('classes.removeStudentTitle', 'Remove Student'),
+      message: t('classes.removeStudentConfirm', 'Remove this student from the class?'),
+      confirmLabel: t('common.remove', 'Remove'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/academic/classes/${selectedClass.id}/students/${studentId}`);
       openClassDetails(selectedClass);
@@ -207,7 +227,13 @@ export default function TeacherClasses() {
   }
 
   async function handleUnassignCourse(courseId) {
-    if (!confirm(t('classes.unassignCourseConfirm', 'Unassign this course from this class?'))) return;
+    const ok = await confirm({
+      title: t('classes.unassignCourseTitle', 'Unassign Course'),
+      message: t('classes.unassignCourseConfirm', 'Unassign this course from this class?'),
+      confirmLabel: t('common.unassign', 'Unassign'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/academic/classes/${selectedClass.id}/courses/${courseId}`);
       openClassDetails(selectedClass);

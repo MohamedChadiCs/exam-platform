@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { BookOpen, Plus, Trash2, Edit3, Users, Building, Search, Check, Layers, Power, PowerOff } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import { useConfirm } from '../lib/ConfirmContext';
 
 export default function Courses() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [courses, setCourses] = useState([]);
   const [classes, setClasses] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -115,7 +117,13 @@ export default function Courses() {
   }
 
   async function handleDelete(course) {
-    if (!confirm(t('courses.archiveConfirm', 'Archive this course?'))) return;
+    const ok = await confirm({
+      title: t('courses.archiveTitle', 'Archive Course'),
+      message: t('courses.archiveConfirm', 'Archive this course?'),
+      confirmLabel: t('courses.archive', 'Archive'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/academic/courses/${course.id}`);
       loadData();
@@ -126,10 +134,19 @@ export default function Courses() {
 
   async function handleToggleStatus(course) {
     const isActive = Boolean(course.is_active);
-    const confirmMsg = isActive
-      ? t('courses.deactivateConfirm', 'Deactivate this course? It will be marked inactive.')
-      : t('courses.activateConfirm', 'Activate this course?');
-    if (!confirm(confirmMsg)) return;
+    const ok = await confirm({
+      title: isActive
+        ? t('courses.deactivateTitle', 'Deactivate Course')
+        : t('courses.activateTitle', 'Activate Course'),
+      message: isActive
+        ? t('courses.deactivateConfirm', 'Deactivate this course? It will be marked inactive.')
+        : t('courses.activateConfirm', 'Activate this course?'),
+      confirmLabel: isActive
+        ? t('courses.deactivate', 'Deactivate')
+        : t('courses.activate', 'Activate'),
+      variant: isActive ? 'warning' : 'primary',
+    });
+    if (!ok) return;
 
     try {
       if (isActive) {

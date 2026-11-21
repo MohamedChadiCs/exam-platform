@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Send, Eye, ShieldAlert } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import { useConfirm } from '../lib/ConfirmContext';
 
 export default function ExamSubmissions() {
   const { id } = useParams();
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [submissions, setSubmissions] = useState([]);
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +77,13 @@ export default function ExamSubmissions() {
   }
 
   async function handlePublishResults() {
-    if (!confirm(t('submissions.publishConfirm', 'Publish results to all students for this examination?'))) return;
+    const ok = await confirm({
+      title: t('submissions.publishTitle', 'Publish Results'),
+      message: t('submissions.publishConfirm', 'Publish results to all students for this examination?'),
+      confirmLabel: t('submissions.publishAll', 'Publish Results'),
+      variant: 'primary',
+    });
+    if (!ok) return;
     try {
       await api.post(`/exams/${id}/publish-results`);
       loadData();

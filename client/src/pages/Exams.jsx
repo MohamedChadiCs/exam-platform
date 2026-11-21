@@ -4,9 +4,11 @@ import { Link } from 'react-router-dom';
 import { Plus, QrCode, BookOpen, Clock, Users, CheckCircle, FileText, Share2, Play, Lock, Edit3, Search, X } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import { useConfirm } from '../lib/ConfirmContext';
 
 export default function Exams() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [exams, setExams] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +119,13 @@ export default function Exams() {
   }
 
   async function handlePublish(id) {
-    if (!confirm(t('exams.publishConfirm', 'Publish this exam? Students will be able to join and take it once it opens.'))) return;
+    const ok = await confirm({
+      title: t('exams.publishTitle', 'Publish Exam'),
+      message: t('exams.publishConfirm', 'Publish this exam? Students will be able to join and take it once it opens.'),
+      confirmLabel: t('exams.publish', 'Publish'),
+      variant: 'primary',
+    });
+    if (!ok) return;
     try {
       await api.post(`/exams/${id}/publish`);
       loadData();
@@ -127,7 +135,13 @@ export default function Exams() {
   }
 
   async function handleClose(id) {
-    if (!confirm(t('exams.closeConfirm', 'Close this exam? No further submissions will be accepted.'))) return;
+    const ok = await confirm({
+      title: t('exams.closeTitle', 'Close Exam'),
+      message: t('exams.closeConfirm', 'Close this exam? No further submissions will be accepted.'),
+      confirmLabel: t('exams.close', 'Close'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.post(`/exams/${id}/close`);
       loadData();

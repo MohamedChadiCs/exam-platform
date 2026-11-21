@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Edit3, HelpCircle, CheckCircle, Tag, Filter, FolderPlus, Folder, X } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import { useConfirm } from '../lib/ConfirmContext';
 
 const QUESTION_TYPES = [
   { code: 'MCQ_SINGLE', label: 'Single Choice (MCQ)' },
@@ -14,6 +15,7 @@ const QUESTION_TYPES = [
 
 export default function Questions() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [questions, setQuestions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -95,7 +97,13 @@ export default function Questions() {
       'Delete category "{{name}}"? Questions will become uncategorized.',
       { name: cat.name }
     );
-    if (!confirm(confirmMsg)) return;
+    const ok = await confirm({
+      title: t('questions.deleteCategoryTitle', 'Delete Category'),
+      message: confirmMsg,
+      confirmLabel: t('common.delete', 'Delete'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     setCatError('');
     try {
       await api.delete(`/questions/categories/${cat.id}`);
@@ -224,7 +232,13 @@ export default function Questions() {
   }
 
   async function handleArchive(id) {
-    if (!confirm(t('questions.archiveConfirm', 'Archive this question? It will not appear in future exams.'))) return;
+    const ok = await confirm({
+      title: t('questions.archiveTitle', 'Archive Question'),
+      message: t('questions.archiveConfirm', 'Archive this question? It will not appear in future exams.'),
+      confirmLabel: t('common.archive', 'Archive'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/questions/${id}`);
       loadData();

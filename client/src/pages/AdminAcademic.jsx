@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Building, GraduationCap, BookOpen } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import { useConfirm } from '../lib/ConfirmContext';
 
 export default function AdminAcademic() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [tab, setTab] = useState('departments'); // 'departments' | 'classes' | 'courses'
   const [departments, setDepartments] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -68,7 +70,13 @@ export default function AdminAcademic() {
   }
 
   async function handleDelete(type, id) {
-    if (!confirm(t('common.confirmDelete', 'Are you sure you want to archive this item?'))) return;
+    const ok = await confirm({
+      title: t('admin.archiveItemTitle', 'Archive Item'),
+      message: t('common.confirmDelete', 'Are you sure you want to archive this item?'),
+      confirmLabel: t('common.archive', 'Archive'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/academic/${type}/${id}`);
       loadData();
