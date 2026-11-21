@@ -17,6 +17,7 @@ export default function Register() {
   const [fields, setFields] = useState({});
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [canLogin, setCanLogin] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   useEffect(() => { api.get('/academic/departments').then(setDepts).catch(() => {}); }, []);
@@ -31,15 +32,19 @@ export default function Register() {
     const body = role === 'STUDENT'
       ? { ...base, matricule: f.matricule, ...(f.classId && { classId: f.classId }) }
       : { ...base, ...(f.departmentId && { departmentId: f.departmentId }), ...(f.title && { title: f.title }) };
-    try { await api.post('/auth/register', body); setSent(true); }
+    try {
+      const res = await api.post('/auth/register', body);
+      setSent(true);
+      setCanLogin(res?.autoLogin === true);
+    }
     catch (err) { setError(errorText(err)); setFields(fieldErrors(err)); }
     finally { setBusy(false); }
   }
 
   if (sent) {
     return (
-      <AuthLayout title={t('register.sent')} footer={<Link to="/login" className="font-medium text-mark hover:underline">{t('common.back')}</Link>}>
-        <Alert kind="ok">{t('register.sentBody')}</Alert>
+      <AuthLayout title={canLogin ? t('register.readyTitle', 'Account created!') : t('register.sent')} footer={<Link to="/login" className="font-medium text-mark hover:underline">{canLogin ? t('login.title') : t('common.back')}</Link>}>
+        <Alert kind="ok">{canLogin ? t('register.readyBody', 'Your account is ready. You can now log in.') : t('register.sentBody')}</Alert>
       </AuthLayout>
     );
   }

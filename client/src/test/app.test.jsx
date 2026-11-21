@@ -91,7 +91,7 @@ describe('register', () => {
   });
   it('professor form has no matricule and sends no student fields', async () => {
     const calls = mockApi({ 'GET /auth/me': unauth, 'GET /academic/departments': depts,
-      'POST /auth/register': { status: 202, body: { success: true, data: {} } } });
+      'POST /auth/register': { status: 201, body: { success: true, data: { autoLogin: true } } } });
     renderApp('/register');
     await userEvent.click(await screen.findByLabelText('Professeur'));
     expect(screen.queryByLabelText('Matricule')).toBeNull();
@@ -100,7 +100,7 @@ describe('register', () => {
     await userEvent.type(screen.getByLabelText('E-mail'), 'omar@x.dz');
     await userEvent.type(screen.getByLabelText('Mot de passe'), 'Professor-Pass-1');
     await userEvent.click(screen.getByRole('button', { name: 'Créer le compte' }));
-    await screen.findByText('Vérifiez votre boîte mail');
+    await screen.findByText('Compte créé !');
     expect(calls.find((c) => c.key === 'POST /auth/register').body.role).toBe('PROFESSOR');
     expect(calls.find((c) => c.key === 'POST /auth/register').body).not.toHaveProperty('matricule');
   });

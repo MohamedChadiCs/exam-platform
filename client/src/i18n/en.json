@@ -61,7 +61,9 @@
     "haveAccount": "Already registered?",
     "passwordHint": "At least 10 characters.",
     "sent": "Check your inbox",
-    "sentBody": "If the details are valid, we sent a verification link to your email. It stays valid for 24 hours."
+    "sentBody": "If the details are valid, we sent a verification link to your email. It stays valid for 24 hours.",
+    "readyTitle": "Account created!",
+    "readyBody": "Your account is ready. You can now log in."
   },
   "verify": {
     "working": "Verifying your email…",

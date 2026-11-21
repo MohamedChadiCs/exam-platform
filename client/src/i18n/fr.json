@@ -61,7 +61,9 @@
     "haveAccount": "Déjà inscrit ?",
     "passwordHint": "Au moins 10 caractères.",
     "sent": "Vérifiez votre boîte mail",
-    "sentBody": "Si les informations sont valides, un lien vous a été envoyé. Il reste valable 24h."
+    "sentBody": "Si les informations sont valides, un lien vous a été envoyé. Il reste valable 24h.",
+    "readyTitle": "Compte créé !",
+    "readyBody": "Votre compte est prêt. Vous pouvez maintenant vous connecter."
   },
   "verify": {
     "working": "Vérification de votre e-mail…",

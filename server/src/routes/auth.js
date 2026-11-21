@@ -33,7 +33,8 @@ const tokenSchema = z.object({ token: z.string().min(20).max(200) }).strict();
 const forgotSchema = z.object({ email }).strict();
 const resetSchema = z.object({ token: z.string().min(20).max(200), password }).strict();
 
-const GENERIC_REGISTER = { message: 'If the data is valid, a verification email has been sent.' };
+const GENERIC_REGISTER_STUDENT = { message: 'If the data is valid, a verification email has been sent.', autoLogin: false };
+const GENERIC_REGISTER_PROFESSOR = { message: 'Account created. You can now log in.', autoLogin: true };
 const GENERIC_FORGOT = { message: 'If an account exists for this email, a reset link has been sent.' };
 
 async function issueToken(userId, purpose, ttlMinutes, db = { query }) {
@@ -56,13 +57,19 @@ export function createAuthRouter(limiters) {
   r.post('/register', limiters.registerByIp, async (req, res) => {
     const d = registerSchema.parse(req.body);
     const hash = await argon2.hash(d.password, HASH_OPTS);
+    const isProfessor = d.role === 'PROFESSOR';
     let verifyToken = null;
+    let registered = false;
     try {
-      verifyToken = await withTx(async (db) => {
+      await withTx(async (db) => {
+        // Professors are ACTIVE immediately (no email verification needed).
+        // Students must verify their email first.
+        const status = isProfessor ? 'ACTIVE' : 'PENDING_EMAIL';
         const { rows } = await db.query(
-          `INSERT INTO users(email,password_hash,role_id,first_name,last_name,locale)
-           VALUES ($1,$2,(SELECT id FROM roles WHERE code=$3),$4,$5,$6) RETURNING id`,
-          [d.email, hash, d.role, d.firstName, d.lastName, d.locale]);
+          `INSERT INTO users(email,password_hash,role_id,first_name,last_name,locale,status,email_verified_at)
+           VALUES ($1,$2,(SELECT id FROM roles WHERE code=$3),$4,$5,$6,$7,$8) RETURNING id`,
+          [d.email, hash, d.role, d.firstName, d.lastName, d.locale,
+           status, isProfessor ? new Date() : null]);
         const id = rows[0].id;
         if (d.role === 'STUDENT') {
           await db.query('INSERT INTO students(user_id,matricule) VALUES ($1,$2)',
@@ -71,12 +78,13 @@ export function createAuthRouter(limiters) {
             await db.query('INSERT INTO class_students(class_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
               [d.classId, id]);
           }
+          verifyToken = await issueToken(id, 'VERIFY_EMAIL', 24 * 60, db);
         } else {
           await db.query('INSERT INTO professors(user_id,department_id,title) VALUES ($1,$2,$3)',
             [id, d.departmentId ?? null, d.title ?? null]);
         }
         await audit({ actorId: id, action: 'USER_REGISTERED', entityType: 'user', entityId: id, ip: req.ip }, db);
-        return issueToken(id, 'VERIFY_EMAIL', 24 * 60, db);
+        registered = true;
       });
     } catch (err) {
       // 23505 unique (email/matricule), 23503 bad FK (class/department): answer identically so nothing leaks
@@ -88,7 +96,8 @@ export function createAuthRouter(limiters) {
         text: `Welcome! Verify your account (valid 24h):\n${env.CLIENT_ORIGIN}/verify-email?token=${verifyToken}\n`,
       });
     }
-    res.status(202).json({ success: true, data: GENERIC_REGISTER });
+    const response = isProfessor ? GENERIC_REGISTER_PROFESSOR : GENERIC_REGISTER_STUDENT;
+    res.status(isProfessor && registered ? 201 : 202).json({ success: true, data: response });
   });
 
   r.post('/verify-email', async (req, res) => {
