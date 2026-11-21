@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import AuthLayout from '../layouts/AuthLayout';
 import Field from '../components/Field';
 import Alert from '../components/Alert';
 import { api } from '../lib/api';
 import { errorText, fieldErrors } from '../lib/errors';
+import { useAuth } from '../lib/AuthContext';
 
 export default function Register() {
   const { t, i18n } = useTranslation();
+  const { setSession } = useAuth();
+  const navigate = useNavigate();
   const [role, setRole] = useState('STUDENT');
   const [f, setF] = useState({ firstName: '', lastName: '', email: '', password: '', matricule: '', departmentId: '', classId: '', title: '' });
   const [depts, setDepts] = useState([]);
@@ -17,7 +20,6 @@ export default function Register() {
   const [fields, setFields] = useState({});
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
-  const [canLogin, setCanLogin] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   useEffect(() => { api.get('/academic/departments').then(setDepts).catch(() => {}); }, []);
@@ -34,8 +36,13 @@ export default function Register() {
       : { ...base, ...(f.departmentId && { departmentId: f.departmentId }), ...(f.title && { title: f.title }) };
     try {
       const res = await api.post('/auth/register', body);
+      // Professors get auto-logged in — the server returns user + csrfToken
+      if (res?.user && res?.csrfToken) {
+        setSession(res);
+        navigate('/app');
+        return;
+      }
       setSent(true);
-      setCanLogin(res?.autoLogin === true);
     }
     catch (err) { setError(errorText(err)); setFields(fieldErrors(err)); }
     finally { setBusy(false); }
@@ -43,8 +50,8 @@ export default function Register() {
 
   if (sent) {
     return (
-      <AuthLayout title={canLogin ? t('register.readyTitle', 'Account created!') : t('register.sent')} footer={<Link to="/login" className="font-medium text-mark hover:underline">{canLogin ? t('login.title') : t('common.back')}</Link>}>
-        <Alert kind="ok">{canLogin ? t('register.readyBody', 'Your account is ready. You can now log in.') : t('register.sentBody')}</Alert>
+      <AuthLayout title={t('register.sent')} footer={<Link to="/login" className="font-medium text-mark hover:underline">{t('common.back')}</Link>}>
+        <Alert kind="ok">{t('register.sentBody')}</Alert>
       </AuthLayout>
     );
   }

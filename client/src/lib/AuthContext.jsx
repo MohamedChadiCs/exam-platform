@@ -21,9 +21,13 @@ export function AuthProvider({ children }) {
     return d.user;
   }, []);
 
+  const setSession = useCallback((data) => {
+    setCsrf(data.csrfToken); setUser(data.user);
+  }, []);
+
   const logout = useCallback(async () => {
     try { await api.post('/auth/logout'); } finally { setCsrf(''); setUser(null); }
   }, []);
 
-  return <Ctx.Provider value={{ user, ready, login, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, ready, login, logout, setSession }}>{children}</Ctx.Provider>;
 }

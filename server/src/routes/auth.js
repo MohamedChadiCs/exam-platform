@@ -59,7 +59,7 @@ export function createAuthRouter(limiters) {
     const hash = await argon2.hash(d.password, HASH_OPTS);
     const isProfessor = d.role === 'PROFESSOR';
     let verifyToken = null;
-    let registered = false;
+    let newUser = null;
     try {
       await withTx(async (db) => {
         // Professors are ACTIVE immediately (no email verification needed).
@@ -67,24 +67,24 @@ export function createAuthRouter(limiters) {
         const status = isProfessor ? 'ACTIVE' : 'PENDING_EMAIL';
         const { rows } = await db.query(
           `INSERT INTO users(email,password_hash,role_id,first_name,last_name,locale,status,email_verified_at)
-           VALUES ($1,$2,(SELECT id FROM roles WHERE code=$3),$4,$5,$6,$7,$8) RETURNING id`,
+           VALUES ($1,$2,(SELECT id FROM roles WHERE code=$3),$4,$5,$6,$7,$8) RETURNING id, email, first_name, last_name, locale`,
           [d.email, hash, d.role, d.firstName, d.lastName, d.locale,
            status, isProfessor ? new Date() : null]);
-        const id = rows[0].id;
+        const row = rows[0];
         if (d.role === 'STUDENT') {
           await db.query('INSERT INTO students(user_id,matricule) VALUES ($1,$2)',
-            [id, d.matricule]);
+            [row.id, d.matricule]);
           if (d.classId) {
             await db.query('INSERT INTO class_students(class_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-              [d.classId, id]);
+              [d.classId, row.id]);
           }
-          verifyToken = await issueToken(id, 'VERIFY_EMAIL', 24 * 60, db);
+          verifyToken = await issueToken(row.id, 'VERIFY_EMAIL', 24 * 60, db);
         } else {
           await db.query('INSERT INTO professors(user_id,department_id,title) VALUES ($1,$2,$3)',
-            [id, d.departmentId ?? null, d.title ?? null]);
+            [row.id, d.departmentId ?? null, d.title ?? null]);
+          newUser = { ...row, role: d.role };
         }
-        await audit({ actorId: id, action: 'USER_REGISTERED', entityType: 'user', entityId: id, ip: req.ip }, db);
-        registered = true;
+        await audit({ actorId: row.id, action: 'USER_REGISTERED', entityType: 'user', entityId: row.id, ip: req.ip }, db);
       });
     } catch (err) {
       // 23505 unique (email/matricule), 23503 bad FK (class/department): answer identically so nothing leaks
@@ -96,8 +96,18 @@ export function createAuthRouter(limiters) {
         text: `Welcome! Verify your account (valid 24h):\n${env.CLIENT_ORIGIN}/verify-email?token=${verifyToken}\n`,
       });
     }
-    const response = isProfessor ? GENERIC_REGISTER_PROFESSOR : GENERIC_REGISTER_STUDENT;
-    res.status(isProfessor && registered ? 201 : 202).json({ success: true, data: response });
+    // Auto-login for professors: create session and set cookie
+    if (isProfessor && newUser) {
+      const token = await createSession(newUser.id, req);
+      await query('UPDATE users SET last_login_at = now() WHERE id=$1', [newUser.id]);
+      await audit({ actorId: newUser.id, action: 'LOGIN', entityType: 'user', entityId: newUser.id, ip: req.ip });
+      res.cookie(SESSION_COOKIE, token, {
+        httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax',
+        maxAge: ABSOLUTE_HOURS * 3600_000, path: '/',
+      });
+      return res.status(201).json({ success: true, data: { user: publicUser(newUser), csrfToken: csrfTokenFor(sha256(token)) } });
+    }
+    res.status(202).json({ success: true, data: GENERIC_REGISTER_STUDENT });
   });
 
   r.post('/verify-email', async (req, res) => {

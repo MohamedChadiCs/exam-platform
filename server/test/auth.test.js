@@ -189,13 +189,15 @@ test('login is rate limited per account', async () => {
 
 test('professor registers without approval, can verify-badge by admin only', async () => {
   const p = client(app.url);
-  // Professors are ACTIVE immediately — no email verification required
+  // Professors are auto-logged-in on registration — response includes user + session cookie
   const regRes = await p.post('/auth/register', { role: 'PROFESSOR', email: 'prof@test.local', password: 'Professor-Pass-1',
     firstName: 'Omar', lastName: 'K' });
   assert.equal(regRes.status, 201);
-  assert.equal(regRes.body.data.autoLogin, true);
-  // Can log in straight away without verifying email
-  assert.equal((await p.login('prof@test.local', 'Professor-Pass-1')).body.data.user.role, 'PROFESSOR');
+  assert.equal(regRes.body.data.user.role, 'PROFESSOR');
+  assert.ok(regRes.body.data.csrfToken, 'csrfToken must be present');
+  assert.ok(regRes.setCookie.some((c) => c.startsWith('sid=')), 'session cookie must be set');
+  p.csrf = regRes.body.data.csrfToken; // set CSRF so subsequent requests work
+  // Already logged in — /auth/me should work
   const id = (await p.get('/auth/me')).body.data.user.id;
   assert.equal((await p.post(`/admin/professors/${id}/verify`)).status, 403);
   await createAdmin();
