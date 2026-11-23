@@ -4,6 +4,7 @@ import { Plus, Trash2, Edit3, HelpCircle, CheckCircle, Tag, Filter, FolderPlus, 
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
 import { useConfirm } from '../lib/ConfirmContext';
+import CodeMorph from '../components/CodeMorph';
 
 const QUESTION_TYPES = [
   { code: 'MCQ_SINGLE', label: 'Single Choice (MCQ)' },
@@ -835,6 +836,18 @@ export default function Questions() {
                       className="input font-mono text-xs"
                     />
                   </div>
+                  {form.config?.starterCode && (
+                    <div>
+                      <span className="text-[11px] font-semibold text-ink-soft uppercase tracking-wider block mb-1">
+                        Code Morph Preview:
+                      </span>
+                      <CodeMorph
+                        code={form.config.starterCode}
+                        language={form.config?.language || 'python'}
+                        className="max-h-52"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="mb-1 block text-xs font-medium text-ink-soft">Expected Output / Test Cases (Optional)</label>
                     <textarea

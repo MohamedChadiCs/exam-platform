@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Send, Eye, ShieldAlert 
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
 import { useConfirm } from '../lib/ConfirmContext';
+import CodeMorph from '../components/CodeMorph';
 
 export default function ExamSubmissions() {
   const { id } = useParams();
@@ -379,25 +380,29 @@ export default function ExamSubmissions() {
                     </div>
                   )}
 
-                  {/* Programming / Code Submission Display */}
+                  {/* Programming / Code Submission Display with Code Morph */}
                   {q.type_code === 'CODE' && (
-                    <div className="mt-3 rounded border border-line bg-slate-950 p-3 text-xs text-white">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 text-slate-400">
-                        <span className="font-mono text-xs font-semibold text-emerald-400">
-                          {q.student_answer?.language || q.config?.language || 'Code submission'}
-                        </span>
-                        <span className="text-[11px]">
-                          {q.student_answer?.code ? `${q.student_answer.code.split('\n').length} lines` : 'No code'}
-                        </span>
-                      </div>
-                      <pre className="overflow-x-auto font-mono text-xs leading-relaxed text-emerald-300 whitespace-pre-wrap">
-                        {q.student_answer?.code || '// No code submitted'}
-                      </pre>
-                      {q.config?.expectedOutput && (
-                        <div className="mt-3 border-t border-slate-800 pt-2 text-[11px] text-slate-400">
-                          <span className="font-semibold text-slate-300">Expected / Notes:</span> {q.config.expectedOutput}
-                        </div>
-                      )}
+                    <div className="mt-3">
+                      <CodeMorph
+                        language={q.student_answer?.language || q.config?.language || 'python'}
+                        snippets={[
+                          {
+                            name: 'Student Submission',
+                            code: q.student_answer?.code || '// No code submitted',
+                            language: q.student_answer?.language || q.config?.language || 'python',
+                          },
+                          ...(q.config?.starterCode ? [{
+                            name: 'Starter Template',
+                            code: q.config.starterCode,
+                            language: q.config?.language || 'python',
+                          }] : []),
+                          ...(q.config?.expectedOutput ? [{
+                            name: 'Expected / Solution',
+                            code: q.config.expectedOutput,
+                            language: q.config?.language || 'python',
+                          }] : [])
+                        ]}
+                      />
                     </div>
                   )}
 

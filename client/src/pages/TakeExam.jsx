@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Clock, ShieldAlert, CheckCircle, ChevronLeft, ChevronRight, Send, AlertTriangle, ArrowUp, ArrowDown, Code, RotateCcw } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import CodeMorph from '../components/CodeMorph';
 
 export default function TakeExam() {
   const { sessionId } = useParams();
@@ -419,45 +420,27 @@ export default function TakeExam() {
                     </div>
                   </div>
                 ) : currentQ.typeCode === 'CODE' ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between rounded-t-lg border border-line bg-slate-900 px-3.5 py-2 text-white">
-                      <div className="flex items-center gap-2">
-                        <Code size={14} className="text-mark" />
-                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-slate-200">
-                          {currentQ.config?.language || 'python'}
-                        </span>
-                      </div>
-                      {currentQ.config?.starterCode && (
-                        <button
-                          type="button"
-                          onClick={() => handleCodeAnswer(currentQ.questionVersionId, currentQ.config.starterCode, currentQ.config?.language || 'python')}
-                          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"
-                          title="Reset editor to initial starter template"
-                        >
-                          <RotateCcw size={12} /> Reset template
-                        </button>
-                      )}
-                    </div>
-                    <textarea
-                      rows={12}
-                      value={answers[currentQ.questionVersionId]?.code ?? (currentQ.config?.starterCode || '')}
-                      onChange={(e) => handleCodeAnswer(currentQ.questionVersionId, e.target.value, currentQ.config?.language || 'python')}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Tab') {
-                          e.preventDefault();
-                          const start = e.target.selectionStart;
-                          const end = e.target.selectionEnd;
-                          const val = e.target.value;
-                          const next = val.substring(0, start) + '  ' + val.substring(end);
-                          handleCodeAnswer(currentQ.questionVersionId, next, currentQ.config?.language || 'python');
-                          setTimeout(() => {
-                            e.target.selectionStart = e.target.selectionEnd = start + 2;
-                          }, 0);
-                        }
-                      }}
-                      placeholder="// Write your solution code here..."
-                      className="w-full rounded-b-lg border border-t-0 border-line bg-slate-950 p-3 font-mono text-xs leading-relaxed text-emerald-400 focus:outline-none focus:ring-1 focus:ring-mark"
-                      spellCheck={false}
+                  <div className="space-y-3">
+                    <p className="text-xs text-ink-soft">
+                      Write your solution in the code window below. You can switch tabs to morph and compare with the starter template:
+                    </p>
+                    <CodeMorph
+                      language={currentQ.config?.language || 'python'}
+                      editable={true}
+                      snippets={[
+                        {
+                          name: 'My Solution',
+                          code: answers[currentQ.questionVersionId]?.code ?? (currentQ.config?.starterCode || ''),
+                          language: currentQ.config?.language || 'python',
+                        },
+                        ...(currentQ.config?.starterCode ? [{
+                          name: 'Starter Template',
+                          code: currentQ.config.starterCode,
+                          language: currentQ.config?.language || 'python',
+                        }] : [])
+                      ]}
+                      onChange={(newCode) => handleCodeAnswer(currentQ.questionVersionId, newCode, currentQ.config?.language || 'python')}
+                      onReset={currentQ.config?.starterCode ? () => handleCodeAnswer(currentQ.questionVersionId, currentQ.config.starterCode, currentQ.config?.language || 'python') : undefined}
                     />
                   </div>
                 ) : (

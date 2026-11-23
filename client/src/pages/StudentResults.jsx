@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Award, CheckCircle, XCircle, Eye, Clock, FileText } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import CodeMorph from '../components/CodeMorph';
 
 export default function StudentResults() {
   const { t } = useTranslation();
@@ -179,9 +180,23 @@ export default function StudentResults() {
                         ))}
                       </div>
                     ) : q.type_code === 'CODE' && q.student_answer?.code ? (
-                      <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-xs text-emerald-300 whitespace-pre-wrap">
-                        {q.student_answer.code}
-                      </pre>
+                      <div className="mt-2">
+                        <CodeMorph
+                          language={q.student_answer?.language || 'python'}
+                          snippets={[
+                            {
+                              name: 'Your Submission',
+                              code: q.student_answer.code,
+                              language: q.student_answer?.language || 'python',
+                            },
+                            ...(q.explanation_md ? [{
+                              name: 'Solution Feedback',
+                              code: q.explanation_md,
+                              language: q.student_answer?.language || 'python',
+                            }] : [])
+                          ]}
+                        />
+                      </div>
                     ) : q.student_answer?.selectedOptionId ? (
                       '(Selected option)'
                     ) : q.student_answer?.value !== undefined ? (

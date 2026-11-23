@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import CodeMorph from '../components/CodeMorph';
 
 function getMatchingCategoryIds(selectedId, catList) {
   if (!selectedId) return null;
@@ -998,6 +999,18 @@ export default function ExamPaperEditor() {
                           className="w-full rounded border border-slate-300 bg-white p-2 font-mono text-xs focus:border-mark focus:outline-none"
                         />
                       </div>
+                      {q.config?.starterCode && (
+                        <div className="mt-2">
+                          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                            Live Code Morph Preview:
+                          </span>
+                          <CodeMorph
+                            code={q.config.starterCode}
+                            language={q.config?.language || 'python'}
+                            className="max-h-60"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 
