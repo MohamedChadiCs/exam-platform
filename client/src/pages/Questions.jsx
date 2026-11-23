@@ -802,52 +802,26 @@ export default function Questions() {
 
               {/* Programming / Code Submission configuration */}
               {form.typeCode === 'CODE' && (
-                <div className="rounded-md border border-line bg-paper p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-ink">Programming Environment</span>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs font-medium text-ink-soft">Language:</label>
-                      <select
-                        value={form.config?.language || 'python'}
-                        onChange={(e) => setForm({ ...form, config: { ...form.config, language: e.target.value } })}
-                        className="rounded border border-line bg-white px-2 py-1 text-xs font-medium"
-                      >
-                        <option value="python">Python</option>
-                        <option value="javascript">JavaScript</option>
-                        <option value="typescript">TypeScript</option>
-                        <option value="java">Java</option>
-                        <option value="cpp">C++</option>
-                        <option value="c">C</option>
-                        <option value="csharp">C#</option>
-                        <option value="go">Go</option>
-                        <option value="rust">Rust</option>
-                        <option value="sql">SQL</option>
-                        <option value="html">HTML / CSS</option>
-                      </select>
-                    </div>
-                  </div>
+                <div className="space-y-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-ink-soft">Starter Code (Template for students)</label>
-                    <textarea
-                      rows={5}
-                      value={form.config?.starterCode ?? ''}
-                      onChange={(e) => setForm({ ...form, config: { ...form.config, starterCode: e.target.value } })}
-                      placeholder="# Enter template/starter code here..."
-                      className="input font-mono text-xs"
+                    <label className="mb-1.5 block text-xs font-medium text-ink-soft">
+                      Programming Environment & Starter Code
+                    </label>
+                    <CodeMorph
+                      code={form.config?.starterCode ?? ''}
+                      language={form.config?.language || 'c'}
+                      onLanguageChange={(newLang) =>
+                        setForm({ ...form, config: { ...form.config, language: newLang } })
+                      }
+                      editable={true}
+                      onChange={(newCode) =>
+                        setForm({ ...form, config: { ...form.config, starterCode: newCode } })
+                      }
+                      placeholder="// Write starter template code here directly for students..."
+                      title="Starter Code"
                     />
                   </div>
-                  {form.config?.starterCode && (
-                    <div>
-                      <span className="text-[11px] font-semibold text-ink-soft uppercase tracking-wider block mb-1">
-                        Code Morph Preview:
-                      </span>
-                      <CodeMorph
-                        code={form.config.starterCode}
-                        language={form.config?.language || 'python'}
-                        className="max-h-52"
-                      />
-                    </div>
-                  )}
+
                   <div>
                     <label className="mb-1 block text-xs font-medium text-ink-soft">Expected Output / Test Cases (Optional)</label>
                     <textarea

@@ -965,52 +965,23 @@ export default function ExamPaperEditor() {
 
                   {/* Programming / Code configuration */}
                   {q.typeCode === 'CODE' && (
-                    <div className="mt-3 rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-700">Code Editor Setup:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-500">Language:</span>
-                          <select
-                            value={q.config?.language || 'python'}
-                            onChange={(e) => updateQuestion(idx, { config: { ...q.config, language: e.target.value } })}
-                            className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium"
-                          >
-                            <option value="python">Python</option>
-                            <option value="javascript">JavaScript</option>
-                            <option value="typescript">TypeScript</option>
-                            <option value="java">Java</option>
-                            <option value="cpp">C++</option>
-                            <option value="c">C</option>
-                            <option value="csharp">C#</option>
-                            <option value="go">Go</option>
-                            <option value="rust">Rust</option>
-                            <option value="sql">SQL</option>
-                            <option value="html">HTML / CSS</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block mb-1">Starter / Template Code:</span>
-                        <textarea
-                          rows={4}
-                          value={q.config?.starterCode ?? ''}
-                          onChange={(e) => updateQuestion(idx, { config: { ...q.config, starterCode: e.target.value } })}
-                          placeholder="# Starter code for students..."
-                          className="w-full rounded border border-slate-300 bg-white p-2 font-mono text-xs focus:border-mark focus:outline-none"
-                        />
-                      </div>
-                      {q.config?.starterCode && (
-                        <div className="mt-2">
-                          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                            Live Code Morph Preview:
-                          </span>
-                          <CodeMorph
-                            code={q.config.starterCode}
-                            language={q.config?.language || 'python'}
-                            className="max-h-60"
-                          />
-                        </div>
-                      )}
+                    <div className="mt-3 space-y-2">
+                      <span className="text-slate-600 font-medium text-xs block">
+                        Programming Environment & Starter Code
+                      </span>
+                      <CodeMorph
+                        code={q.config?.starterCode ?? ''}
+                        language={q.config?.language || 'c'}
+                        onLanguageChange={(newLang) =>
+                          updateQuestion(idx, { config: { ...q.config, language: newLang } })
+                        }
+                        editable={true}
+                        onChange={(newCode) =>
+                          updateQuestion(idx, { config: { ...q.config, starterCode: newCode } })
+                        }
+                        placeholder="// Write starter template code here directly for students..."
+                        title="Starter Code"
+                      />
                     </div>
                   )}
 
