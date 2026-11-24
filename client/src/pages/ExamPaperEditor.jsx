@@ -391,7 +391,10 @@ export default function ExamPaperEditor() {
         navigate(`/app/exams/${savedExamId}/edit`, { replace: true });
       }
     } catch (err) {
-      setError(err.message);
+      const details = err.details?.length
+        ? ` (${err.details.map((d) => `${d.path ? d.path + ': ' : ''}${d.message}`).join(', ')}`
+        : '';
+      setError(`${err.message}${details}`);
     } finally {
       setSaving(false);
     }

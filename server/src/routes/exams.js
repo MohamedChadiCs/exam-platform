@@ -18,10 +18,10 @@ const inlineOptionSchema = z.object({
 
 const inlineQuestionSchema = z.object({
   questionVersionId: z.string().uuid().optional(),
-  categoryId: z.string().uuid().optional().nullable(),
+  categoryId: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   typeCode: z.string().default('MCQ_SINGLE'),
   bodyMd: z.string().trim().min(1),
-  explanationMd: z.string().trim().optional().nullable(),
+  explanationMd: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.string().trim().nullable().optional()),
   points: z.coerce.number().min(0).default(1),
   config: z.record(z.any()).default({}),
   options: z.array(inlineOptionSchema).default([]),

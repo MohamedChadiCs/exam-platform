@@ -78,18 +78,18 @@ questionsRouter.delete('/categories/:id', async (req, res) => {
 // ==========================================
 
 const optionSchema = z.object({
-  position: z.number().int().min(0),
+  position: z.number().int().min(0).default(0),
   bodyMd: z.string().trim().min(1),
   isCorrect: z.boolean().default(false),
   feedbackMd: z.string().trim().optional().nullable(),
 });
 
 const questionCreateSchema = z.object({
-  categoryId: z.string().uuid().optional().nullable(),
+  categoryId: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   typeCode: z.string().min(1),
   locale: z.enum(['ar', 'fr', 'en']).default('fr'),
   bodyMd: z.string().trim().min(1),
-  explanationMd: z.string().trim().optional().nullable(),
+  explanationMd: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.string().trim().nullable().optional()),
   defaultPoints: z.coerce.number().min(0).default(1),
   config: z.record(z.any()).default({}),
   options: z.array(optionSchema).default([]),
@@ -181,10 +181,12 @@ questionsRouter.post('/', async (req, res) => {
     );
     const version = vRows[0];
 
-    // 3. Insert options if any
+    // 3. Insert options if any (only for option-based question types)
     let options = [];
-    if (b.options.length > 0) {
+    const isOptionType = ['MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE'].includes(b.typeCode);
+    if (isOptionType && b.options.length > 0) {
       for (const opt of b.options) {
+        if (!opt.bodyMd || !opt.bodyMd.trim()) continue;
         const { rows: optRows } = await db.query(
           `INSERT INTO answer_options (question_version_id, position, body_md, is_correct, feedback_md)
            VALUES ($1, $2, $3, $4, $5)
@@ -273,10 +275,12 @@ questionsRouter.put('/:id', async (req, res) => {
     );
     const version = vRows[0];
 
-    // Insert options
+    // Insert options (only for option-based question types)
     let options = [];
-    if (b.options.length > 0) {
+    const isOptionType = ['MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE'].includes(b.typeCode);
+    if (isOptionType && b.options.length > 0) {
       for (const opt of b.options) {
+        if (!opt.bodyMd || !opt.bodyMd.trim()) continue;
         const { rows: optRows } = await db.query(
           `INSERT INTO answer_options (question_version_id, position, body_md, is_correct, feedback_md)
            VALUES ($1, $2, $3, $4, $5)

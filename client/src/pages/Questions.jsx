@@ -257,16 +257,33 @@ export default function Questions() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+
+    const isOptionBased = ['MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE'].includes(form.typeCode);
+    const sanitizedOptions = isOptionBased
+      ? form.options.filter((o) => o.bodyMd && o.bodyMd.trim().length > 0)
+      : [];
+
+    const payload = {
+      ...form,
+      categoryId: form.categoryId ? form.categoryId : null,
+      explanationMd: form.explanationMd?.trim() || null,
+      options: sanitizedOptions,
+      config: form.config || {},
+    };
+
     try {
       if (editingQuestion) {
-        await api.put(`/questions/${editingQuestion.id}`, form);
+        await api.put(`/questions/${editingQuestion.id}`, payload);
       } else {
-        await api.post('/questions', form);
+        await api.post('/questions', payload);
       }
       setShowModal(false);
       loadData();
     } catch (err) {
-      setError(err.message);
+      const details = err.details?.length
+        ? ` (${err.details.map((d) => `${d.path ? d.path + ': ' : ''}${d.message}`).join(', ')})`
+        : '';
+      setError(`${err.message}${details}`);
     }
   }
 
