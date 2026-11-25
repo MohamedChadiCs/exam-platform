@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Clock, ShieldAlert, CheckCircle, ChevronLeft, ChevronRight, Send, AlertTriangle,
-  ArrowUp, ArrowDown, Code, RotateCcw, FileText, BookOpen, Target, Award, CheckCircle2
+  Clock, ShieldAlert, Send, AlertTriangle,
+  ArrowUp, ArrowDown, FileText, BookOpen, Award, CheckCircle2
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
@@ -18,8 +18,8 @@ export default function TakeExam() {
 
   const [session, setSession] = useState(null);
   const [questions, setQuestions] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [paperViewMode, setPaperViewMode] = useState('single'); // 'single' | 'double' | 'focus'
+  const [activeExerciseIdx, setActiveExerciseIdx] = useState(0);
+  const [paperViewMode, setPaperViewMode] = useState('single'); // 'single' | 'double'
   const [answers, setAnswers] = useState({});
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saving' | 'saved' | 'error'
   const [remainingSeconds, setRemainingSeconds] = useState(null);
@@ -210,10 +210,8 @@ export default function TakeExam() {
     return <div className="mx-auto max-w-lg py-8"><Alert variant="danger">{error}</Alert></div>;
   }
 
-  const currentQ = questions[currentIndex];
   const answeredCount = Object.keys(answers).length;
   const totalPoints = questions.reduce((sum, q) => sum + (parseFloat(q.points) || 0), 0);
-  const isLast = currentIndex === questions.length - 1;
   const candidateName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || 'Student Candidate';
 
   const TYPE_LABELS = {
@@ -238,12 +236,10 @@ export default function TakeExam() {
 
   // Helper to jump to exercise on paper
   function jumpToExercise(idx) {
-    setCurrentIndex(idx);
-    if (paperViewMode !== 'focus') {
-      const el = document.getElementById(`student-exercise-${idx + 1}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+    setActiveExerciseIdx(idx);
+    const el = document.getElementById(`student-exercise-${idx + 1}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 
@@ -608,7 +604,7 @@ export default function TakeExam() {
   const sheet2Questions = questions.slice(splitIdx);
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] pb-12">
+    <div className="-mx-4 -my-6 sm:-mx-6 md:-my-8 lg:-mx-8 min-h-screen bg-slate-100/80 pb-16">
       {/* =========================================================================
           STICKY TOP EXAMINATION BAR (Always visible during exam)
          ========================================================================= */}
@@ -681,7 +677,7 @@ export default function TakeExam() {
               <button
                 type="button"
                 onClick={() => setPaperViewMode('double')}
-                className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-all ${
+                className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-all ${
                   paperViewMode === 'double'
                     ? 'bg-white shadow-xs text-ink font-semibold'
                     : 'text-ink-soft hover:text-ink'
@@ -690,19 +686,6 @@ export default function TakeExam() {
               >
                 <BookOpen size={13} />
                 <span className="hidden sm:inline">2 Papers</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaperViewMode('focus')}
-                className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-all ${
-                  paperViewMode === 'focus'
-                    ? 'bg-white shadow-xs text-ink font-semibold'
-                    : 'text-ink-soft hover:text-ink'
-                }`}
-                title="Focused Single Exercise"
-              >
-                <Target size={13} />
-                <span className="hidden sm:inline">Focus</span>
               </button>
             </div>
 
@@ -724,7 +707,7 @@ export default function TakeExam() {
           <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
             {questions.map((q, idx) => {
               const isAnswered = !!answers[q.questionVersionId];
-              const isCurrent = idx === currentIndex;
+              const isCurrent = idx === activeExerciseIdx;
 
               return (
                 <button
@@ -824,58 +807,6 @@ export default function TakeExam() {
                 <span>Page 1 of 1</span>
                 <span>Total Exercises: {questions.length}</span>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* FOCUS MODE (Single exercise at a time with navigation) */}
-        {paperViewMode === 'focus' && (
-          <div className="mx-auto max-w-3xl px-3 sm:px-4">
-            <div className="relative rounded-sm border border-slate-300 bg-white p-5 sm:p-8 shadow-xl">
-              <div className="border-b border-slate-300 pb-3 flex items-center justify-between">
-                <div>
-                  <span className="font-serif text-sm font-bold text-slate-900 block">
-                    {session?.examTitle}
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    Candidate: {candidateName}
-                  </span>
-                </div>
-                <div className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                  Exercise {currentIndex + 1} of {questions.length}
-                </div>
-              </div>
-
-              {currentQ ? (
-                <div className="mt-4">
-                  {renderStudentExercise(currentQ, currentIndex)}
-
-                  {/* Navigation controls */}
-                  <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-4">
-                    <button
-                      disabled={currentIndex === 0}
-                      onClick={() => setCurrentIndex((i) => i - 1)}
-                      className="btn-quiet text-xs"
-                    >
-                      <ChevronLeft size={15} /> Previous Exercise
-                    </button>
-
-                    {isLast ? (
-                      <button onClick={() => setShowSubmitModal(true)} className="btn-primary text-xs">
-                        Review & Submit Paper <Send size={13} />
-                      </button>
-                    ) : (
-                      <button onClick={() => setCurrentIndex((i) => i + 1)} className="btn-primary text-xs">
-                        Next Exercise <ChevronRight size={15} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="py-8 text-center text-xs text-slate-400">
-                  No questions in this examination.
-                </div>
-              )}
             </div>
           </div>
         )}
