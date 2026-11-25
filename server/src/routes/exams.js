@@ -61,7 +61,7 @@ async function syncExamQuestions(db, examId, professorId, questions) {
     // If new question, insert into questions, question_versions, and answer_options
     if (!qvId) {
       const { rows: qRows } = await db.query(
-        `INSERT INTO questions (owner_id, category_id) VALUES ($1, $2) RETURNING id`,
+        `INSERT INTO questions (owner_id, category_id, in_bank) VALUES ($1, $2, false) RETURNING id`,
         [professorId, q.categoryId ?? null]
       );
       const questionId = qRows[0].id;
@@ -181,7 +181,7 @@ examsRouter.get('/:id', async (req, res) => {
   const { rows: questions } = await query(
     `SELECT eq.position, eq.points, qv.id AS question_version_id, qv.question_id,
             qv.version, qv.type_code, qv.body_md, qv.explanation_md, qv.config,
-            q.category_id, qc.name AS category_name
+            q.category_id, q.in_bank, qc.name AS category_name
        FROM exam_questions eq
        JOIN question_versions qv ON qv.id = eq.question_version_id
        JOIN questions q ON q.id = qv.question_id

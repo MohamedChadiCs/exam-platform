@@ -127,6 +127,7 @@ export default function ExamPaperEditor() {
             setQuestions(
               ex.questions.map((q) => ({
                 questionVersionId: q.question_version_id,
+                inBank: !!q.in_bank,
                 categoryId: q.category_id ?? '',
                 typeCode: q.type_code,
                 bodyMd: q.body_md,
@@ -275,6 +276,7 @@ export default function ExamPaperEditor() {
 
     const imported = {
       questionVersionId: bankQ.version_id,
+      inBank: true,
       categoryId: bankQ.category_id ?? '',
       typeCode: bankQ.type_code,
       bodyMd: bankQ.body_md,
@@ -321,7 +323,7 @@ export default function ExamPaperEditor() {
     }
   }
 
-  // Save a single question directly to the Question Bank
+  // Save a single question to the Question Bank (only when explicitly requested)
   async function saveQuestionToBank(qIdx) {
     const q = questions[qIdx];
     if (!q || !q.bodyMd?.trim()) {
@@ -329,22 +331,27 @@ export default function ExamPaperEditor() {
       return;
     }
     try {
-      const payload = {
-        categoryId: q.categoryId || null,
-        typeCode: q.typeCode,
-        bodyMd: q.bodyMd,
-        explanationMd: q.explanationMd || null,
-        defaultPoints: q.points || 1,
-        config: q.config || {},
-        options: (q.options || []).map((o, idx) => ({
-          position: idx,
-          bodyMd: o.bodyMd,
-          isCorrect: !!o.isCorrect,
-          feedbackMd: o.feedbackMd || null,
-        })),
-      };
-      const res = await api.post('/questions', payload);
-      updateQuestion(qIdx, { questionVersionId: res.versionId });
+      if (q.questionVersionId) {
+        await api.post(`/questions/versions/${q.questionVersionId}/add-to-bank`);
+        updateQuestion(qIdx, { inBank: true });
+      } else {
+        const payload = {
+          categoryId: q.categoryId || null,
+          typeCode: q.typeCode,
+          bodyMd: q.bodyMd,
+          explanationMd: q.explanationMd || null,
+          defaultPoints: q.points || 1,
+          config: q.config || {},
+          options: (q.options || []).map((o, idx) => ({
+            position: idx,
+            bodyMd: o.bodyMd,
+            isCorrect: !!o.isCorrect,
+            feedbackMd: o.feedbackMd || null,
+          })),
+        };
+        const res = await api.post('/questions', payload);
+        updateQuestion(qIdx, { questionVersionId: res.versionId, inBank: true });
+      }
       const bList = await api.get('/questions').catch(() => []);
       setBankQuestions(bList);
       setSuccessMsg(`Exercise ${qIdx + 1} saved to Question Bank.`);
@@ -419,15 +426,13 @@ export default function ExamPaperEditor() {
         return;
       }
 
-      // Reload exam questions so newly created questions get their questionVersionId, and refresh bank
-      const [refreshedExam, bList] = await Promise.all([
-        api.get(`/exams/${savedExamId}`),
-        api.get('/questions').catch(() => []),
-      ]);
+      // Reload exam questions so newly created questions get their questionVersionId without adding to bank
+      const refreshedExam = await api.get(`/exams/${savedExamId}`);
       if (refreshedExam?.questions) {
         setQuestions(
           refreshedExam.questions.map((q) => ({
             questionVersionId: q.question_version_id,
+            inBank: !!q.in_bank,
             categoryId: q.category_id || '',
             typeCode: q.type_code,
             bodyMd: q.body_md,
@@ -443,9 +448,8 @@ export default function ExamPaperEditor() {
           }))
         );
       }
-      setBankQuestions(bList);
 
-      setSuccessMsg('Exam paper saved and questions synced to Question Bank.');
+      setSuccessMsg('Exam paper saved successfully.');
       if (!id) {
         navigate(`/app/exams/${savedExamId}/edit`, { replace: true });
       }
@@ -1025,7 +1029,7 @@ export default function ExamPaperEditor() {
               {/* Question Actions Toolbar (Bank Sync / Reorder / Delete) */}
               <div className="mt-2 flex items-center justify-between gap-2 text-slate-400">
                 <div>
-                  {q.questionVersionId ? (
+                  {q.inBank ? (
                     <span className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10.5px] font-medium text-emerald-700">
                       <CheckCircle2 size={11} /> In Question Bank
                     </span>

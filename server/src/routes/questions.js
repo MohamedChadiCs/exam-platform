@@ -149,7 +149,7 @@ questionsRouter.get('/', async (req, res) => {
        JOIN LATERAL (
          SELECT * FROM question_versions WHERE question_id = q.id ORDER BY version DESC LIMIT 1
        ) qv ON true
-      WHERE q.owner_id = $1 AND q.archived_at IS NULL
+      WHERE q.owner_id = $1 AND q.archived_at IS NULL AND q.in_bank = true
         AND ($2::uuid IS NULL OR q.category_id IN (SELECT id FROM cat_tree))
         AND ($3::text IS NULL OR qv.type_code = $3)
         AND ($4::text IS NULL OR qv.body_md ILIKE '%'||$4||'%')
@@ -215,6 +215,19 @@ questionsRouter.post('/', async (req, res) => {
   });
 
   res.status(201).json({ success: true, data: result });
+});
+
+questionsRouter.post('/versions/:versionId/add-to-bank', async (req, res) => {
+  const { versionId } = z.object({ versionId: z.string().uuid() }).parse(req.params);
+  const { rowCount } = await query(
+    `UPDATE questions q
+        SET in_bank = true
+       FROM question_versions qv
+      WHERE qv.id = $1 AND qv.question_id = q.id AND q.owner_id = $2`,
+    [versionId, req.auth.user.id]
+  );
+  if (!rowCount) throw AppError.notFound('Question not found');
+  res.json({ success: true, data: { versionId, inBank: true } });
 });
 
 questionsRouter.get('/:id', async (req, res) => {
