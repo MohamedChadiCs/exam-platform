@@ -34,6 +34,7 @@ export default function StudentExams() {
     setStartingId(examId);
     setError('');
     try {
+      await document.documentElement.requestFullscreen?.().catch(() => {});
       const res = await api.post(`/student/exams/${examId}/start`, {});
       navigate(`/app/exam-session/${res.sessionId}`);
     } catch (err) {
@@ -107,7 +108,10 @@ export default function StudentExams() {
                     <div>
                       {hasActiveSession ? (
                         <button
-                          onClick={() => navigate(`/app/exam-session/${ex.active_session_id}`)}
+                          onClick={async () => {
+                            await document.documentElement.requestFullscreen?.().catch(() => {});
+                            navigate(`/app/exam-session/${ex.active_session_id}`);
+                          }}
                           className="btn-primary"
                         >
                           <Play size={16} /> Resume Examination

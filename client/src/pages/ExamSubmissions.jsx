@@ -160,7 +160,11 @@ export default function ExamSubmissions() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {s.security_events_count > 0 ? (
+                    {s.fullscreen_exits_count > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-red-100 border border-red-300 px-2 py-0.5 text-xs font-semibold text-red-800">
+                        <ShieldAlert size={12} /> Fullscreen Exit (Auto-Submitted)
+                      </span>
+                    ) : s.security_events_count > 0 ? (
                       <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                         <ShieldAlert size={12} /> {s.security_events_count} events
                       </span>
@@ -202,20 +206,26 @@ export default function ExamSubmissions() {
             </div>
 
             {/* Security events if any */}
-            {sessionDetail.securityEvents.length > 0 && (
-              <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
-                <div className="flex items-center gap-1.5 font-medium text-xs text-amber-800">
-                  <ShieldAlert size={14} /> Integrity Events Recorded ({sessionDetail.securityEvents.length})
+            {sessionDetail.securityEvents.length > 0 && (() => {
+              const hasFsExit = sessionDetail.securityEvents.some((e) => e.event_type === 'FULLSCREEN_EXIT');
+              return (
+                <div className={`mt-4 rounded-md border p-3 ${hasFsExit ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                  <div className={`flex items-center gap-1.5 font-semibold text-xs ${hasFsExit ? 'text-red-800' : 'text-amber-800'}`}>
+                    <ShieldAlert size={14} />
+                    {hasFsExit
+                      ? `Fullscreen Exit Violation — Examination Auto-Submitted (${sessionDetail.securityEvents.length} events)`
+                      : `Integrity Events Recorded (${sessionDetail.securityEvents.length})`}
+                  </div>
+                  <div className={`mt-2 space-y-1 text-xs ${hasFsExit ? 'text-red-700' : 'text-amber-700'}`}>
+                    {sessionDetail.securityEvents.map((e) => (
+                      <div key={e.id} className={e.event_type === 'FULLSCREEN_EXIT' ? 'font-semibold text-red-900' : ''}>
+                        • {new Date(e.received_at).toLocaleTimeString()}: {e.event_type === 'FULLSCREEN_EXIT' ? 'FULLSCREEN_EXIT — Student quit fullscreen (Auto-submitted & locked)' : `${e.event_type} (${e.severity})`}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-2 space-y-1 text-xs text-amber-700">
-                  {sessionDetail.securityEvents.map((e) => (
-                    <div key={e.id}>
-                      • {new Date(e.received_at).toLocaleTimeString()}: {e.event_type} ({e.severity})
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Questions & Grading */}
             <div className="mt-6 space-y-6">

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Clock, ShieldAlert, Send, AlertTriangle,
-  ArrowUp, ArrowDown, FileText, BookOpen, Award, CheckCircle2
+  ArrowUp, ArrowDown, FileText, BookOpen, Award, CheckCircle2, Maximize2, Lock
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
@@ -28,8 +28,24 @@ export default function TakeExam() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [securityWarnings, setSecurityWarnings] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
+  const [terminatedReason, setTerminatedReason] = useState(null);
 
   const seqRef = useRef(1);
+  const enteredFullscreenRef = useRef(!!document.fullscreenElement);
+  const terminatingRef = useRef(false);
+
+  async function enterFullscreen() {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+      enteredFullscreenRef.current = true;
+      setIsFullscreen(true);
+    } catch {
+      // Browser may block if not triggered by direct user gesture
+    }
+  }
 
   // Load session & questions
   async function loadSession() {
@@ -40,6 +56,9 @@ export default function TakeExam() {
       setSession(res.session);
       setQuestions(res.questions);
       setRemainingSeconds(res.session.remainingSeconds);
+      if (res.session.status !== 'IN_PROGRESS') {
+        setTerminatedReason('ALREADY_SUBMITTED');
+      }
 
       // Pre-fill answers from saved state
       const initialAnswers = {};
@@ -75,6 +94,32 @@ export default function TakeExam() {
     }, 1000);
     return () => clearInterval(interval);
   }, [remainingSeconds]);
+
+  // Strict Fullscreen Enforcement: auto-submit & lock if student exits fullscreen
+  useEffect(() => {
+    if (!session || session.status !== 'IN_PROGRESS' || terminatedReason) return;
+
+    function onFullscreenChange() {
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      if (fs) {
+        enteredFullscreenRef.current = true;
+      } else if (enteredFullscreenRef.current && !terminatingRef.current) {
+        terminatingRef.current = true;
+        setTerminatedReason('FULLSCREEN_EXIT');
+        setSession((prev) => (prev ? { ...prev, status: 'AUTO_SUBMITTED' } : prev));
+        api.post(`/student/sessions/${sessionId}/security-event`, {
+          eventType: 'FULLSCREEN_EXIT',
+          severity: 'WARNING',
+          details: { message: 'Student exited fullscreen mode; exam auto-submitted and locked.' },
+          clientTs: new Date().toISOString(),
+        }).catch(() => {});
+      }
+    }
+
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, [session, sessionId, terminatedReason]);
 
   // Focus & Integrity Monitoring
   useEffect(() => {
@@ -182,8 +227,10 @@ export default function TakeExam() {
   }
 
   async function handleAutoSubmit() {
+    terminatingRef.current = true;
     try {
       await api.post(`/student/sessions/${sessionId}/submit`);
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
       navigate('/app/results');
     } catch (err) {
       setError(err.message);
@@ -191,11 +238,14 @@ export default function TakeExam() {
   }
 
   async function handleSubmit() {
+    terminatingRef.current = true;
     setSubmitting(true);
     try {
       await api.post(`/student/sessions/${sessionId}/submit`);
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
       navigate('/app/results');
     } catch (err) {
+      terminatingRef.current = false;
       setError(err.message);
       setSubmitting(false);
       setShowSubmitModal(false);
@@ -208,6 +258,71 @@ export default function TakeExam() {
 
   if (error && !session) {
     return <div className="mx-auto max-w-lg py-8"><Alert variant="danger">{error}</Alert></div>;
+  }
+
+  // Locked / Auto-Submitted screen (cannot do anything else)
+  if (terminatedReason || (session && session.status !== 'IN_PROGRESS')) {
+    const isViolation = terminatedReason === 'FULLSCREEN_EXIT';
+    return (
+      <div className="mx-auto max-w-lg py-16 px-4">
+        <div className={`rounded-xl border-2 p-8 text-center shadow-lg bg-white ${isViolation ? 'border-red-300' : 'border-slate-300'}`}>
+          <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${isViolation ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
+            {isViolation ? <ShieldAlert size={28} /> : <Lock size={28} />}
+          </div>
+          <h1 className="mt-4 text-xl font-bold text-slate-900">
+            {isViolation ? 'Examination Auto-Submitted & Locked' : 'Examination Session Closed'}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            {isViolation
+              ? 'You exited fullscreen mode during the examination. Your current answers have been automatically submitted, your session is permanently locked, and this violation has been reported to your teacher.'
+              : 'This examination session has already been submitted and is locked. You can no longer view or modify answers.'}
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+                navigate('/app/exams/take');
+              }}
+              className="btn-primary text-xs"
+            >
+              Return to My Examinations
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Fullscreen Gate before viewing/answering exam paper
+  if (!isFullscreen) {
+    return (
+      <div className="mx-auto max-w-lg py-16 px-4">
+        <div className="rounded-xl border border-slate-300 bg-white p-8 text-center shadow-xl">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-mark-tint text-mark">
+            <Maximize2 size={26} />
+          </div>
+          <h1 className="mt-4 text-xl font-bold text-slate-900 font-serif">
+            {session?.examTitle || 'Examination Fullscreen Mode'}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            This examination must be taken in <strong>fullscreen mode</strong>.
+          </p>
+          <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3.5 text-left text-xs leading-relaxed text-amber-900">
+            <strong>Important Rule:</strong> Once you enter fullscreen mode, exiting it (e.g. pressing <kbd className="rounded border border-amber-400 bg-white px-1 py-0.5 font-mono text-[10px]">Esc</kbd> or leaving fullscreen) will <strong>immediately auto-submit your exam</strong>, lock your session, and report the incident to your teacher.
+          </div>
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={enterFullscreen}
+              className="btn-primary w-full justify-center py-3 text-sm font-semibold shadow-sm"
+            >
+              <Maximize2 size={16} /> Enter Fullscreen &amp; View Exam Paper
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const answeredCount = Object.keys(answers).length;
@@ -604,7 +719,7 @@ export default function TakeExam() {
   const sheet2Questions = questions.slice(splitIdx);
 
   return (
-    <div className="-mx-4 -my-6 sm:-mx-6 md:-my-8 lg:-mx-8 min-h-screen bg-slate-100/80 pb-16">
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-100 pb-16">
       {/* =========================================================================
           STICKY TOP EXAMINATION BAR (Always visible during exam)
          ========================================================================= */}

@@ -386,7 +386,8 @@ examsRouter.get('/:id/submissions', async (req, res) => {
     `SELECT s.id AS session_id, s.attempt_no, s.status AS session_status, s.started_at, s.submitted_at,
             u.id AS user_id, u.first_name, u.last_name, u.email, st.matricule,
             sub.total_score, sub.percentage, sub.passed, sub.results_published_at,
-            (SELECT count(*)::int FROM security_events WHERE session_id = s.id) AS security_events_count
+            (SELECT count(*)::int FROM security_events WHERE session_id = s.id) AS security_events_count,
+            (SELECT count(*)::int FROM security_events WHERE session_id = s.id AND event_type = 'FULLSCREEN_EXIT') AS fullscreen_exits_count
        FROM exam_sessions s
        JOIN exam_enrollments en ON en.id = s.enrollment_id
        JOIN students st ON st.user_id = en.student_id

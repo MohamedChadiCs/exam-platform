@@ -550,13 +550,46 @@ studentRouter.post('/sessions/:id/security-event', requireApprovedStudent, async
 
   const studentId = req.auth.user.id;
 
-  const { rowCount } = await query(
-    `INSERT INTO security_events (session_id, user_id, event_type, severity, details, ip, client_ts)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, studentId, body.eventType, body.severity, JSON.stringify(body.details), req.ip, body.clientTs ?? new Date()]
-  );
+  const result = await withTx(async (db) => {
+    const { rows: sessionRows } = await db.query(
+      `SELECT s.id, s.status
+         FROM exam_sessions s
+         JOIN exam_enrollments en ON en.id = s.enrollment_id
+        WHERE s.id = $1 AND en.student_id = $2
+        FOR UPDATE`,
+      [id, studentId]
+    );
+    const session = sessionRows[0];
+    if (!session) throw AppError.notFound('Session not found');
 
-  res.json({ success: true, data: { recorded: rowCount > 0 } });
+    const { rowCount } = await db.query(
+      `INSERT INTO security_events (session_id, user_id, event_type, severity, details, ip, client_ts)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, studentId, body.eventType, body.severity, JSON.stringify(body.details), req.ip, body.clientTs ?? new Date()]
+    );
+
+    let autoSubmitted = false;
+    if (body.eventType === 'FULLSCREEN_EXIT' && session.status === 'IN_PROGRESS') {
+      await db.query(
+        `UPDATE exam_sessions SET status = 'AUTO_SUBMITTED', submitted_at = now() WHERE id = $1`,
+        [id]
+      );
+      await gradeSession(id, db);
+      await audit({
+        actorId: studentId,
+        action: 'EXAM_AUTO_SUBMITTED_FULLSCREEN_EXIT',
+        entityType: 'exam_session',
+        entityId: id,
+        ip: req.ip,
+        after: { reason: 'Student exited fullscreen mode' },
+      }, db);
+      autoSubmitted = true;
+    }
+
+    return { recorded: rowCount > 0, autoSubmitted };
+  });
+
+  res.json({ success: true, data: result });
 });
 
 // ==========================================
