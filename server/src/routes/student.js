@@ -349,10 +349,15 @@ studentRouter.get('/sessions/:id', requireApprovedStudent, async (req, res) => {
 
   const { rows: sessionRows } = await query(
     `SELECT s.id, s.status, s.started_at, s.deadline_at, s.submitted_at,
-            e.id AS exam_id, e.title AS exam_title, e.monitor_focus, e.duration_minutes
+            e.id AS exam_id, e.title AS exam_title, e.description_md, e.monitor_focus,
+            e.duration_minutes, e.max_score, e.passing_score,
+            c.name AS course_name, c.code AS course_code,
+            d.name AS department_name
        FROM exam_sessions s
        JOIN exam_enrollments en ON en.id = s.enrollment_id
        JOIN exams e ON e.id = en.exam_id
+       LEFT JOIN courses c ON c.id = e.course_id
+       LEFT JOIN departments d ON d.id = c.department_id
       WHERE s.id = $1 AND en.student_id = $2`,
     [id, studentId]
   );
@@ -431,6 +436,13 @@ studentRouter.get('/sessions/:id', requireApprovedStudent, async (req, res) => {
         status: session.status,
         examId: session.exam_id,
         examTitle: session.exam_title,
+        descriptionMd: session.description_md,
+        durationMinutes: session.duration_minutes,
+        maxScore: session.max_score,
+        passingScore: session.passing_score,
+        courseName: session.course_name,
+        courseCode: session.course_code,
+        departmentName: session.department_name,
         monitorFocus: session.monitor_focus,
         deadlineAt: session.deadline_at,
         remainingSeconds,

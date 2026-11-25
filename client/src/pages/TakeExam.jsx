@@ -214,6 +214,21 @@ export default function TakeExam() {
   const answeredCount = Object.keys(answers).length;
   const totalPoints = questions.reduce((sum, q) => sum + (parseFloat(q.points) || 0), 0);
   const isLast = currentIndex === questions.length - 1;
+  const candidateName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || 'Student Candidate';
+
+  const TYPE_LABELS = {
+    MCQ_SINGLE: 'Single Choice (MCQ)',
+    MCQ_MULTI: 'Multiple Choice',
+    TRUE_FALSE: 'True / False',
+    SHORT_TEXT: 'Short Answer',
+    LONG_TEXT: 'Long Answer',
+    ESSAY: 'Essay',
+    NUMERIC: 'Numeric',
+    MATCHING: 'Matching',
+    ORDERING: 'Ordering',
+    FILL_BLANK: 'Fill in the Blank',
+    CODE: 'Code',
+  };
 
   // Format timer
   const minutes = Math.floor((remainingSeconds || 0) / 60);
@@ -240,7 +255,7 @@ export default function TakeExam() {
       <div
         key={q.questionVersionId || idx}
         id={`student-exercise-${idx + 1}`}
-        className="group relative py-4 first:pt-2 border-b border-slate-200 last:border-b-0"
+        className="group relative py-3 first:pt-1.5 border-b border-slate-200 last:border-b-0"
       >
         {/* Exercise Header on Paper */}
         <div className="flex items-center justify-between gap-3">
@@ -248,23 +263,19 @@ export default function TakeExam() {
             <span className="font-serif text-sm sm:text-base font-bold text-slate-900">
               Exercise {idx + 1}
             </span>
-            <span className="rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 uppercase font-semibold">
-              {q.typeCode}
+            <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+              {TYPE_LABELS[q.typeCode] || q.typeCode}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {isAnswered ? (
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                <CheckCircle2 size={12} /> Answered
-              </span>
-            ) : (
-              <span className="text-[11px] text-slate-400 italic">
-                Unanswered
+            {isAnswered && (
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                <CheckCircle2 size={13} />
               </span>
             )}
             <span className="font-mono text-xs font-bold text-slate-700">
-              [{q.points} {q.points === 1 ? 'pt' : 'pts'}]
+              [ {q.points} {q.points === 1 ? 'pt' : 'pts'} ]
             </span>
           </div>
         </div>
@@ -506,54 +517,42 @@ export default function TakeExam() {
     );
   }
 
-  // Academic Header Banner for Student Paper
+  // Academic Header Banner for Student Paper (matches ExamPaperEditor layout)
   function renderStudentAcademicHeader() {
     return (
-      <div className="border-b-2 border-slate-900 pb-3 text-center">
+      <div className="border-b border-slate-900 pb-3 text-center">
         <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
-          Department of Academic Studies
+          Department of {session?.departmentName || 'Academic Studies'}
         </div>
+        {(session?.courseCode || session?.courseName) && (
+          <div className="mt-1 flex items-center justify-center gap-1.5 text-xs">
+            <span className="text-[11px] font-semibold uppercase text-slate-500">Course:</span>
+            <span className="font-bold text-slate-800">
+              {[session?.courseCode, session?.courseName].filter(Boolean).join(' — ')}
+            </span>
+          </div>
+        )}
         <h1 className="mt-1 text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-900 font-serif">
           {session?.examTitle || 'Official Examination'}
         </h1>
 
-        {/* Candidate Details Identification Strip */}
-        <div className="mt-3 rounded border border-slate-300 bg-slate-50/80 p-2.5 text-xs text-slate-700">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Candidate Name:</span>
-              <strong className="text-slate-900">{user?.name || 'Student Candidate'}</strong>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Student Matricule / ID:</span>
-              <strong className="text-slate-900">{user?.matricule || ('STU-' + (user?.id ? user.id.substring(0, 8) : '0000'))}</strong>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Date of Examination:</span>
-              <strong className="text-slate-900">{new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</strong>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Session ID:</span>
-              <strong className="font-mono text-slate-900">#{sessionId?.substring(0, 8)}</strong>
-            </div>
-          </div>
-        </div>
-
-        {/* Exam Meta Ribbon */}
-        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-600">
+        {/* Exam Meta Strip on Paper */}
+        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-4 border-t border-slate-200 pt-2 text-[11px] text-slate-600">
           <div className="flex items-center gap-1">
-            <Clock size={13} className="text-slate-500" />
-            <span>Duration: <strong>{session?.durationMinutes || 60} Minutes</strong></span>
+            <Clock size={12} className="text-slate-500" />
+            <span>Duration: <strong>{session?.durationMinutes || 60} min</strong></span>
           </div>
           <div className="flex items-center gap-1">
-            <Award size={13} className="text-slate-500" />
-            <span>Total Marks: <strong>{totalPoints} Points</strong></span>
+            <Award size={12} className="text-slate-500" />
+            <span>Total Score: <strong>{totalPoints} Points</strong></span>
           </div>
+          {session?.passingScore != null && (
+            <div>
+              <span>Pass: <strong>{session.passingScore} Pts</strong></span>
+            </div>
+          )}
           <div>
-            <span>Total Exercises: <strong>{questions.length}</strong></span>
-          </div>
-          <div>
-            <span>Status: <strong className="text-emerald-700 uppercase">In Progress</strong></span>
+            <span>Candidate: <strong className="text-slate-800">{candidateName}</strong></span>
           </div>
         </div>
       </div>
@@ -609,7 +608,7 @@ export default function TakeExam() {
   const sheet2Questions = questions.slice(splitIdx);
 
   return (
-    <div className="pb-12">
+    <div className="min-h-screen bg-[#F1F5F9] pb-12">
       {/* =========================================================================
           STICKY TOP EXAMINATION BAR (Always visible during exam)
          ========================================================================= */}
@@ -623,7 +622,7 @@ export default function TakeExam() {
                   {session?.examTitle}
                 </span>
                 <span className="hidden sm:inline text-xs text-ink-soft">
-                  • {user?.name || 'Candidate'}
+                  • {candidateName}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-[11px]">
@@ -787,7 +786,7 @@ export default function TakeExam() {
                     {session?.examTitle || 'Examination'} — Continuation Sheet
                   </div>
                   <div className="mt-0.5 text-[11px] text-slate-500 font-mono flex items-center justify-center gap-3">
-                    <span>Candidate: <strong>{user?.name || 'Student'}</strong></span>
+                    <span>Candidate: <strong>{candidateName}</strong></span>
                     <span>•</span>
                     <span>Page 2 of 2</span>
                   </div>
@@ -839,7 +838,7 @@ export default function TakeExam() {
                     {session?.examTitle}
                   </span>
                   <span className="text-[11px] text-slate-500">
-                    Candidate: {user?.name || 'Student'}
+                    Candidate: {candidateName}
                   </span>
                 </div>
                 <div className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
