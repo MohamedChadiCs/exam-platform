@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Plus, QrCode, BookOpen, Clock, Users, CheckCircle, FileText, Share2, Play, Lock, Edit3, Search, X, Archive, RotateCcw } from 'lucide-react';
+import { Plus, QrCode, BookOpen, Clock, Users, CheckCircle, FileText, Share2, Play, Lock, Edit3, Search, X, Archive, RotateCcw, FileDown } from 'lucide-react';
 import { api } from '../lib/api';
+import { exportExamPaperToPdf } from '../lib/exportUtils';
 import Alert from '../components/Alert';
 import { useConfirm } from '../lib/ConfirmContext';
 
@@ -13,6 +14,7 @@ export default function Exams() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [exportingExamId, setExportingExamId] = useState(null);
 
   // Filters state
   const [search, setSearch] = useState('');
@@ -458,6 +460,28 @@ export default function Exams() {
                     <Link to={`/app/exams/${ex.id}/submissions`} className="btn-quiet text-xs py-1.5 px-3">
                       <Users size={14} /> {t('exams.submissions', 'Submissions')} ({ex.session_count ?? 0})
                     </Link>
+
+                    <button
+                      type="button"
+                      disabled={exportingExamId === ex.id}
+                      onClick={async () => {
+                        setExportingExamId(ex.id);
+                        setError('');
+                        try {
+                          const fullExam = await api.get(`/exams/${ex.id}`);
+                          const course = courses.find((c) => c.id === ex.course_id);
+                          exportExamPaperToPdf(fullExam, course);
+                        } catch (err) {
+                          setError(err.message);
+                        } finally {
+                          setExportingExamId(null);
+                        }
+                      }}
+                      className="btn-quiet text-xs py-1.5 px-3"
+                      title={t('exams.exportPdf', 'Export PDF')}
+                    >
+                      <FileDown size={14} /> {exportingExamId === ex.id ? t('common.loading', 'Exporting...') : t('exams.exportPdf', 'Export PDF')}
+                    </button>
 
                     {ex.status !== 'ARCHIVED' ? (
                       <button

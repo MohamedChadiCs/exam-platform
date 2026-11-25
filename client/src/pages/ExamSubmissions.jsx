@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Send, Eye, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Send, Eye, ShieldAlert, FileSpreadsheet, FileDown } from 'lucide-react';
 import { api } from '../lib/api';
+import { exportGradesToExcel, exportGradesToPdf } from '../lib/exportUtils';
 import Alert from '../components/Alert';
 import { useConfirm } from '../lib/ConfirmContext';
 import CodeMorph from '../components/CodeMorph';
@@ -111,9 +112,27 @@ export default function ExamSubmissions() {
           </p>
         </div>
 
-        <button onClick={handlePublishResults} className="btn-primary self-start text-xs">
-          <Send size={14} /> {t('submissions.publishAll', 'Publish Results to Students')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          <button
+            type="button"
+            disabled={submissions.length === 0}
+            onClick={() => exportGradesToExcel(exam, submissions)}
+            className="btn-quiet text-xs"
+          >
+            <FileSpreadsheet size={14} /> {t('submissions.exportExcel', 'Export Excel')}
+          </button>
+          <button
+            type="button"
+            disabled={submissions.length === 0}
+            onClick={() => exportGradesToPdf(exam, submissions)}
+            className="btn-quiet text-xs"
+          >
+            <FileDown size={14} /> {t('submissions.exportPdf', 'Export PDF')}
+          </button>
+          <button onClick={handlePublishResults} className="btn-primary text-xs">
+            <Send size={14} /> {t('submissions.publishAll', 'Publish Results to Students')}
+          </button>
+        </div>
       </div>
 
       {error && <div className="mt-4"><Alert variant="danger">{error}</Alert></div>}

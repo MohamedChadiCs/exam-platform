@@ -3,9 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Plus, Trash2, ArrowUp, ArrowDown, Save, Send, Settings,
-  CheckCircle2, Clock, Award, BookOpen, Library, HelpCircle, FileText, Tag, FolderPlus
+  CheckCircle2, Clock, Award, BookOpen, Library, HelpCircle, FileText, Tag, FolderPlus, FileDown
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { exportExamPaperToPdf } from '../lib/exportUtils';
 import Alert from '../components/Alert';
 import CodeMorph from '../components/CodeMorph';
 
@@ -517,6 +518,15 @@ export default function ExamPaperEditor() {
                 <span>2 Papers</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={() => exportExamPaperToPdf({ ...exam, questions }, selectedCourse)}
+              className="btn-quiet text-xs py-1.5 px-3"
+              title="Export exam paper as PDF"
+            >
+              <FileDown size={14} /> Export PDF
+            </button>
 
             <button
               onClick={() => setShowSettings(!showSettings)}
