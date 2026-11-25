@@ -13,6 +13,7 @@ import { academicRouter } from './routes/academic.js';
 import { questionsRouter } from './routes/questions.js';
 import { examsRouter } from './routes/exams.js';
 import { studentRouter } from './routes/student.js';
+import { uploadsRouter } from './routes/uploads.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { originCheck, attachSession, createAuthLimiters } from './middleware/security.js';
@@ -35,7 +36,7 @@ export function createApp() {
       res.status(429).json({ success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests' } }),
   }));
 
-  app.use(express.json({ limit: '100kb' }));
+  app.use(express.json({ limit: '8mb' }));
   app.use(cookieParser());
   app.use(originCheck);
   app.use(attachSession);
@@ -47,6 +48,7 @@ export function createApp() {
   app.use('/api/v1/questions', questionsRouter);
   app.use('/api/v1/exams', examsRouter);
   app.use('/api/v1/student', studentRouter);
+  app.use('/api/v1/uploads', uploadsRouter);
 
   app.use(notFound);
   app.use(errorHandler);

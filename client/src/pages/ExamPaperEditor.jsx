@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Plus, Trash2, ArrowUp, ArrowDown, Save, Send, Settings,
-  CheckCircle2, Clock, Award, BookOpen, Library, HelpCircle, FileText, Tag, FolderPlus, FileDown
+  CheckCircle2, Clock, Award, BookOpen, Library, HelpCircle, FileText, Tag, FolderPlus, FileDown,
+  Paperclip, Image, Music, Video, Upload
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { exportExamPaperToPdf, sanitizeFilename } from '../lib/exportUtils';
@@ -72,10 +73,12 @@ export default function ExamPaperEditor() {
   const [questions, setQuestions] = useState([
     {
       typeCode: 'MCQ_SINGLE',
+      title: 'LIFO Data Structures',
       bodyMd: 'Which data structure operates on a Last-In, First-Out (LIFO) basis?',
       explanationMd: 'A Stack is a LIFO data structure, whereas a Queue is FIFO.',
       points: 5,
       config: {},
+      attachments: [],
       options: [
         { bodyMd: 'Queue', isCorrect: false },
         { bodyMd: 'Stack', isCorrect: true },
@@ -85,10 +88,12 @@ export default function ExamPaperEditor() {
     },
     {
       typeCode: 'TRUE_FALSE',
+      title: 'Database Constraints',
       bodyMd: 'In relational databases, primary keys can contain NULL values.',
       explanationMd: 'Primary keys must contain UNIQUE and NOT NULL values.',
       points: 5,
       config: {},
+      attachments: [],
       options: [
         { bodyMd: 'True', isCorrect: false },
         { bodyMd: 'False', isCorrect: true },
@@ -133,11 +138,13 @@ export default function ExamPaperEditor() {
                 inBank: !!q.in_bank,
                 categoryId: q.category_id ?? '',
                 typeCode: q.type_code,
+                title: q.title || '',
                 bodyMd: q.body_md,
                 explanationMd: q.explanation_md ?? '',
                 points: Number(q.points),
                 config: q.config ?? {},
                 options: q.options ? q.options.map((o) => ({ bodyMd: o.body_md, isCorrect: o.is_correct })) : [],
+                attachments: q.attachments || q.config?.attachments || [],
               }))
             );
           }
@@ -203,14 +210,81 @@ export default function ExamPaperEditor() {
 
     const newQ = {
       typeCode: type,
+      title: '',
       bodyMd: type === 'FILL_BLANK' ? 'The capital of France is [blank-1].' : 'Type your question statement here...',
       explanationMd: '',
       points: 5,
       categoryId: '',
       config,
       options: defaultOptions,
+      attachments: [],
     };
     setQuestions([...questions, newQ]);
+  }
+
+  async function handleFileUpload(qIdx, fileList) {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError(`File "${file.name}" is too large. Maximum size is 5 MB.`);
+        continue;
+      }
+      try {
+        const reader = new FileReader();
+        const base64Promise = new Promise((resolve, reject) => {
+          reader.onload = () => {
+            const res = reader.result;
+            const base64 = typeof res === 'string' ? res.split(',')[1] : '';
+            resolve(base64);
+          };
+          reader.onerror = reject;
+        });
+        reader.readAsDataURL(file);
+        const dataBase64 = await base64Promise;
+
+        let uploadRes = null;
+        try {
+          uploadRes = await api.post('/uploads/question-attachment', {
+            filename: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            dataBase64,
+            questionVersionId: questions[qIdx]?.questionVersionId || null,
+          });
+        } catch {
+          // If network error, fallback to data url
+          uploadRes = null;
+        }
+
+        const newAttachment = uploadRes
+          ? {
+              id: uploadRes.id,
+              filename: uploadRes.filename,
+              mime_type: uploadRes.mime_type,
+              size_bytes: uploadRes.size_bytes,
+              url: uploadRes.url,
+            }
+          : {
+              id: 'temp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+              filename: file.name,
+              mime_type: file.type,
+              size_bytes: file.size,
+              dataBase64,
+              url: URL.createObjectURL(file),
+            };
+
+        const currentAtts = questions[qIdx].attachments || [];
+        updateQuestion(qIdx, { attachments: [...currentAtts, newAttachment] });
+      } catch (err) {
+        setError(`Failed to read "${file.name}": ${err.message}`);
+      }
+    }
+  }
+
+  function removeAttachment(qIdx, aIdx) {
+    const currentAtts = [...(questions[qIdx].attachments || [])];
+    currentAtts.splice(aIdx, 1);
+    updateQuestion(qIdx, { attachments: currentAtts });
   }
 
   function updateQuestion(index, fields) {
@@ -406,11 +480,13 @@ export default function ExamPaperEditor() {
         questionVersionId: q.questionVersionId,
         categoryId: q.categoryId || null,
         typeCode: q.typeCode,
+        title: q.title || null,
         bodyMd: q.bodyMd,
         explanationMd: q.explanationMd,
         points: q.points,
         config: q.config,
         options: q.options,
+        attachments: q.attachments || [],
       })),
     };
 
@@ -438,6 +514,7 @@ export default function ExamPaperEditor() {
             inBank: !!q.in_bank,
             categoryId: q.category_id || '',
             typeCode: q.type_code,
+            title: q.title || '',
             bodyMd: q.body_md,
             explanationMd: q.explanation_md ?? '',
             points: parseFloat(q.points),
@@ -448,6 +525,7 @@ export default function ExamPaperEditor() {
               isCorrect: o.is_correct,
               feedbackMd: o.feedback_md,
             })),
+            attachments: q.attachments || q.config?.attachments || [],
           }))
         );
       }
@@ -696,15 +774,100 @@ export default function ExamPaperEditor() {
                 )}
               </div>
 
-              {/* Question Prompt */}
-              <div className="mt-1.5">
+              {/* Question Title & Prompt / Description */}
+              <div className="mt-2 space-y-1.5">
+                <input
+                  type="text"
+                  value={q.title || ''}
+                  onChange={(e) => updateQuestion(idx, { title: e.target.value })}
+                  placeholder="Question Title (optional, e.g. Data Structures & Analysis)"
+                  className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800 placeholder-slate-400 hover:border-slate-300 focus:border-mark focus:outline-none"
+                />
                 <textarea
                   rows={2}
                   value={q.bodyMd}
                   onChange={(e) => updateQuestion(idx, { bodyMd: e.target.value })}
-                  placeholder="Enter the question problem statement or text here..."
-                  className="w-full rounded border border-transparent p-1.5 text-xs leading-relaxed text-slate-800 hover:border-slate-300 focus:border-mark focus:bg-slate-50 focus:outline-none"
+                  placeholder="Enter the question problem statement or description here..."
+                  className="w-full rounded border border-slate-200 bg-white p-2 text-xs leading-relaxed text-slate-800 hover:border-slate-300 focus:border-mark focus:outline-none"
                 />
+              </div>
+
+              {/* Attachments Section (Images, Audio, Video) */}
+              <div className="mt-2 rounded-md border border-dashed border-slate-200 bg-slate-50/70 p-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                    <Paperclip size={13} className="text-slate-400" />
+                    <span>Media Attachments</span>
+                    <span className="text-[10px] text-slate-400 font-normal">(Images, Audio, Video)</span>
+                    {q.attachments?.length > 0 && (
+                      <span className="rounded-full bg-slate-200 px-1.5 py-0.2 text-[10px] font-bold text-slate-700">
+                        {q.attachments.length}
+                      </span>
+                    )}
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-1 rounded bg-white px-2 py-1 text-[11px] font-medium text-mark border border-slate-200 shadow-2xs hover:bg-slate-50">
+                    <Upload size={12} />
+                    <span>+ Attach File</span>
+                    <input
+                      type="file"
+                      accept="image/*,audio/*,video/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(idx, e.target.files)}
+                    />
+                  </label>
+                </div>
+
+                {q.attachments && q.attachments.length > 0 && (
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {q.attachments.map((att, aIdx) => (
+                      <div
+                        key={att.id || aIdx}
+                        className="relative flex items-center gap-2 rounded border border-slate-200 bg-white p-2 shadow-2xs"
+                      >
+                        {att.mime_type?.startsWith('image/') || att.mimeType?.startsWith('image/') ? (
+                          <img
+                            src={att.url || (att.dataBase64 ? `data:${att.mime_type || att.mimeType};base64,${att.dataBase64}` : '')}
+                            alt={att.filename}
+                            className="h-12 w-12 rounded object-cover border border-slate-100 shrink-0"
+                          />
+                        ) : att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/') ? (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-amber-50 text-amber-600">
+                            <Music size={20} />
+                          </div>
+                        ) : (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-blue-50 text-blue-600">
+                            <Video size={20} />
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs font-medium text-slate-800" title={att.filename}>
+                            {att.filename}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {att.mime_type || att.mimeType || 'file'} {att.size_bytes ? `• ${Math.round(att.size_bytes / 1024)} KB` : ''}
+                          </div>
+                          {(att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/')) && (
+                            <audio controls src={att.url || (att.dataBase64 ? `data:${att.mime_type || att.mimeType};base64,${att.dataBase64}` : '')} className="mt-1 h-6 w-full" />
+                          )}
+                          {(att.mime_type?.startsWith('video/') || att.mimeType?.startsWith('video/')) && (
+                            <video controls src={att.url || (att.dataBase64 ? `data:${att.mime_type || att.mimeType};base64,${att.dataBase64}` : '')} className="mt-1 max-h-24 w-full rounded" />
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(idx, aIdx)}
+                          className="text-slate-300 hover:text-red-500 p-1 shrink-0"
+                          title="Remove attachment"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Answers / Options Area */}

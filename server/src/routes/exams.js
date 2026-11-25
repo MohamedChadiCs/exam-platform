@@ -20,11 +20,13 @@ const inlineQuestionSchema = z.object({
   questionVersionId: z.string().uuid().optional(),
   categoryId: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   typeCode: z.string().default('MCQ_SINGLE'),
+  title: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.string().trim().nullable().optional()),
   bodyMd: z.string().trim().min(1),
   explanationMd: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.string().trim().nullable().optional()),
   points: z.coerce.number().min(0).default(1),
   config: z.record(z.any()).default({}),
   options: z.array(inlineOptionSchema).default([]),
+  attachments: z.array(z.any()).optional().default([]),
 });
 
 const examSchema = z.object({
@@ -66,11 +68,12 @@ async function syncExamQuestions(db, examId, professorId, questions) {
       );
       const questionId = qRows[0].id;
 
+      const fullConfig = { ...(q.config ?? {}), attachments: q.attachments || [] };
       const { rows: vRows } = await db.query(
-        `INSERT INTO question_versions (question_id, version, type_code, locale, body_md, explanation_md, default_points, config)
-         VALUES ($1, 1, $2, 'fr', $3, $4, $5, $6)
+        `INSERT INTO question_versions (question_id, version, type_code, locale, title, body_md, explanation_md, default_points, config)
+         VALUES ($1, 1, $2, 'fr', $3, $4, $5, $6, $7)
          RETURNING id`,
-        [questionId, q.typeCode, q.bodyMd, q.explanationMd ?? null, q.points, JSON.stringify(q.config ?? {})]
+        [questionId, q.typeCode, q.title ?? null, q.bodyMd, q.explanationMd ?? null, q.points, JSON.stringify(fullConfig)]
       );
       qvId = vRows[0].id;
 
@@ -98,6 +101,16 @@ async function syncExamQuestions(db, examId, professorId, questions) {
        VALUES ($1, $2, $3, $4)`,
       [examId, qvId, pos + 1, q.points]
     );
+
+    if (q.attachments && Array.isArray(q.attachments) && q.attachments.length > 0) {
+      const attIds = q.attachments.map((a) => a.id).filter(Boolean);
+      if (attIds.length > 0) {
+        await db.query(
+          `UPDATE question_attachments SET question_version_id = $1 WHERE id = ANY($2::uuid[])`,
+          [qvId, attIds]
+        );
+      }
+    }
   }
 }
 
@@ -180,7 +193,7 @@ examsRouter.get('/:id', async (req, res) => {
   // Fetch assigned questions with their versions and options
   const { rows: questions } = await query(
     `SELECT eq.position, eq.points, qv.id AS question_version_id, qv.question_id,
-            qv.version, qv.type_code, qv.body_md, qv.explanation_md, qv.config,
+            qv.version, qv.type_code, qv.title, qv.body_md, qv.explanation_md, qv.config,
             q.category_id, q.in_bank, qc.name AS category_name
        FROM exam_questions eq
        JOIN question_versions qv ON qv.id = eq.question_version_id
@@ -206,6 +219,25 @@ examsRouter.get('/:id', async (req, res) => {
     ...q,
     options: options.filter((o) => o.question_version_id === q.question_version_id),
   }));
+
+  // Fetch attachments for all questions
+  let attachments = [];
+  if (qvIds.length > 0) {
+    const { rows: attRows } = await query(
+      `SELECT id, question_version_id, filename, mime_type, size_bytes, position, created_at
+         FROM question_attachments WHERE question_version_id = ANY($1::uuid[])
+         ORDER BY position, created_at`,
+      [qvIds]
+    );
+    attachments = attRows;
+  }
+
+  enrichedQuestions.forEach((q) => {
+    const dbAtts = attachments.filter((a) => a.question_version_id === q.question_version_id);
+    q.attachments = dbAtts.length > 0
+      ? dbAtts.map((a) => ({ ...a, url: `/api/v1/uploads/${a.id}` }))
+      : (q.config?.attachments || []);
+  });
 
   // Fetch access codes
   const { rows: codes } = await query(
@@ -492,6 +524,25 @@ examsRouter.get('/:id/submissions/:sessionId', async (req, res) => {
     ...q,
     options: options.filter((o) => o.question_version_id === q.question_version_id),
   }));
+
+  // Fetch attachments for all questions
+  let attachments = [];
+  if (qvIds.length > 0) {
+    const { rows: attRows } = await query(
+      `SELECT id, question_version_id, filename, mime_type, size_bytes, position, created_at
+         FROM question_attachments WHERE question_version_id = ANY($1::uuid[])
+         ORDER BY position, created_at`,
+      [qvIds]
+    );
+    attachments = attRows;
+  }
+
+  enrichedQuestions.forEach((q) => {
+    const dbAtts = attachments.filter((a) => a.question_version_id === q.question_version_id);
+    q.attachments = dbAtts.length > 0
+      ? dbAtts.map((a) => ({ ...a, url: `/api/v1/uploads/${a.id}` }))
+      : (q.config?.attachments || []);
+  });
 
   res.json({
     success: true,

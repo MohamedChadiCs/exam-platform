@@ -381,7 +381,7 @@ studentRouter.get('/sessions/:id', requireApprovedStudent, async (req, res) => {
   // Fetch session questions
   const { rows: questions } = await query(
     `SELECT sq.position, sq.points, sq.question_version_id, sq.option_order,
-            qv.type_code, qv.body_md, qv.locale, qv.config
+            qv.type_code, qv.title, qv.body_md, qv.locale, qv.config
        FROM session_questions sq
        JOIN question_versions qv ON qv.id = sq.question_version_id
       WHERE sq.session_id = $1
@@ -401,6 +401,18 @@ studentRouter.get('/sessions/:id', requireApprovedStudent, async (req, res) => {
     options = optRows;
   }
 
+  // Fetch attachments for these questions
+  let attachments = [];
+  if (qvIds.length > 0) {
+    const { rows: attRows } = await query(
+      `SELECT id, question_version_id, filename, mime_type, size_bytes, position
+         FROM question_attachments WHERE question_version_id = ANY($1::uuid[])
+         ORDER BY position, created_at`,
+      [qvIds]
+    );
+    attachments = attRows;
+  }
+
   // Fetch student's saved answers
   const { rows: savedAnswers } = await query(
     `SELECT question_version_id, answer, seq, saved_at FROM student_answers WHERE session_id = $1`,
@@ -416,13 +428,16 @@ studentRouter.get('/sessions/:id', requireApprovedStudent, async (req, res) => {
     } else {
       qOptions.sort((a, b) => a.position - b.position);
     }
+    const qAtts = attachments.filter((a) => a.question_version_id === q.question_version_id);
     return {
       position: q.position,
       questionVersionId: q.question_version_id,
       typeCode: q.type_code,
+      title: q.title || null,
       bodyMd: q.body_md,
       points: q.points,
       options: qOptions,
+      attachments: qAtts.length > 0 ? qAtts.map((a) => ({ ...a, url: `/api/v1/uploads/${a.id}` })) : (q.config?.attachments || []),
       config: sanitizeConfigForStudent(q.type_code, q.config),
       savedAnswer: answersMap.get(q.question_version_id) ?? null,
     };

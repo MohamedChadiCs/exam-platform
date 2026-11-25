@@ -47,4 +47,5 @@ export const api = {
   post: (p, b = {}) => request('POST', p, b),
   put: (p, b = {}) => request('PUT', p, b),
   delete: (p) => request('DELETE', p),
+  uploadUrl: (attachmentId) => `${API_BASE}/uploads/${attachmentId}`,
 };

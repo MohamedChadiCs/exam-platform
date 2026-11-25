@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Clock, ShieldAlert, Send, AlertTriangle,
-  ArrowUp, ArrowDown, FileText, BookOpen, Award, CheckCircle2, Maximize2, Lock
+  ArrowUp, ArrowDown, FileText, BookOpen, Award, CheckCircle2, Maximize2, Lock,
+  Music, Video, Paperclip
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
@@ -372,7 +373,7 @@ export default function TakeExam() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="font-serif text-sm sm:text-base font-bold text-slate-900">
-              Exercise {idx + 1}
+              Exercise {idx + 1}{q.title ? ` — ${q.title}` : ''}
             </span>
             <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
               {TYPE_LABELS[q.typeCode] || q.typeCode}
@@ -395,6 +396,58 @@ export default function TakeExam() {
         <div className="mt-2 text-xs sm:text-[13px] leading-relaxed font-medium text-slate-800 whitespace-pre-wrap">
           {q.bodyMd}
         </div>
+
+        {/* Question Attachments (Images, Audio, Video) */}
+        {q.attachments && q.attachments.length > 0 && (
+          <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <Paperclip size={13} className="text-slate-500" />
+              <span>Attachments ({q.attachments.length})</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {q.attachments.map((att, aIdx) => (
+                <div key={att.id || aIdx} className="overflow-hidden rounded-md border border-slate-200 bg-white p-2">
+                  {att.mime_type?.startsWith('image/') || att.mimeType?.startsWith('image/') ? (
+                    <div>
+                      <img
+                        src={att.url}
+                        alt={att.filename}
+                        className="max-h-64 w-full rounded object-contain bg-slate-50"
+                      />
+                      <div className="mt-1 text-[11px] font-medium text-slate-600 truncate">{att.filename}</div>
+                    </div>
+                  ) : att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/') ? (
+                    <div>
+                      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-700 truncate">
+                        <Music size={14} className="text-amber-600 shrink-0" />
+                        <span className="truncate">{att.filename}</span>
+                      </div>
+                      <audio controls src={att.url} className="w-full h-8" />
+                    </div>
+                  ) : att.mime_type?.startsWith('video/') || att.mimeType?.startsWith('video/') ? (
+                    <div>
+                      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-700 truncate">
+                        <Video size={14} className="text-blue-600 shrink-0" />
+                        <span className="truncate">{att.filename}</span>
+                      </div>
+                      <video controls src={att.url} className="max-h-60 w-full rounded bg-black" />
+                    </div>
+                  ) : (
+                    <a
+                      href={att.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 text-xs font-medium text-mark hover:underline"
+                    >
+                      <Paperclip size={14} />
+                      <span className="truncate">{att.filename}</span>
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Question Answering Area on Paper */}
         <div className="mt-3">

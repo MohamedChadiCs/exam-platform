@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Send, Eye, ShieldAlert, FileSpreadsheet, FileDown } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Send, Eye, ShieldAlert, FileSpreadsheet, FileDown, Paperclip, Music, Video } from 'lucide-react';
 import { api } from '../lib/api';
 import { exportGradesToExcel, exportGradesToPdf, sanitizeFilename } from '../lib/exportUtils';
 import ExportModal from '../components/ExportModal';
@@ -254,8 +254,27 @@ export default function ExamSubmissions() {
                 <div key={q.question_version_id} className="rounded-lg border border-line p-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="text-xs font-semibold text-mark">Question {idx + 1} ({q.type_code})</span>
+                      <span className="text-xs font-semibold text-mark">
+                        Question {idx + 1}{q.title ? ` — ${q.title}` : ''} ({q.type_code})
+                      </span>
                       <div className="mt-1 font-medium text-ink">{q.body_md}</div>
+                      {q.attachments && q.attachments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {q.attachments.map((att, aIdx) => (
+                            <div key={att.id || aIdx} className="rounded border border-slate-200 bg-slate-50 p-1.5 text-xs">
+                              {att.mime_type?.startsWith('image/') || att.mimeType?.startsWith('image/') ? (
+                                <img src={att.url} alt={att.filename} className="max-h-28 rounded object-contain" />
+                              ) : att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/') ? (
+                                <div className="flex items-center gap-1.5"><Music size={13} className="text-amber-600" /><span>{att.filename}</span></div>
+                              ) : att.mime_type?.startsWith('video/') || att.mimeType?.startsWith('video/') ? (
+                                <div className="flex items-center gap-1.5"><Video size={13} className="text-blue-600" /><span>{att.filename}</span></div>
+                              ) : (
+                                <div className="flex items-center gap-1.5"><Paperclip size={13} /><span>{att.filename}</span></div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <span className="text-xs font-bold text-ink-soft">Max: {q.max_points} pts</span>
                   </div>

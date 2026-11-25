@@ -377,18 +377,34 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
     doc.setFontSize(11.5);
     doc.setTextColor(15, 23, 42);
     const typeLabel = QUESTION_TYPE_LABELS[typeCode] || typeCode;
-    doc.text(`Exercise ${idx + 1}`, margin, y);
+    const exTitle = q.title ? `Exercise ${idx + 1}: ${q.title}` : `Exercise ${idx + 1}`;
+    doc.text(exTitle, margin, y);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(`(${typeLabel})`, margin + 62, y);
+    const titleWidth = doc.getTextWidth(exTitle);
+    doc.text(`(${typeLabel})`, margin + titleWidth + 6, y);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(51, 65, 85);
     doc.text(`[ ${points} pts ]`, pageWidth - margin, y, { align: 'right' });
     y += 16;
+
+    // Attachments indicator if any
+    const attachments = q.attachments || q.config?.attachments || [];
+    if (attachments.length > 0) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8.5);
+      doc.setTextColor(79, 70, 229);
+      attachments.forEach((att) => {
+        const attLabel = `[Attachment: ${att.filename} (${att.mime_type || att.mimeType || 'media'})]`;
+        doc.text(attLabel, margin, y);
+        y += 12;
+      });
+      y += 2;
+    }
 
     // Question Body
     doc.setFont('helvetica', 'normal');
