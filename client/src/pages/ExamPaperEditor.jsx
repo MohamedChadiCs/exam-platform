@@ -321,6 +321,38 @@ export default function ExamPaperEditor() {
     }
   }
 
+  // Save a single question directly to the Question Bank
+  async function saveQuestionToBank(qIdx) {
+    const q = questions[qIdx];
+    if (!q || !q.bodyMd?.trim()) {
+      setError('Please enter a question statement before saving to the Question Bank.');
+      return;
+    }
+    try {
+      const payload = {
+        categoryId: q.categoryId || null,
+        typeCode: q.typeCode,
+        bodyMd: q.bodyMd,
+        explanationMd: q.explanationMd || null,
+        defaultPoints: q.points || 1,
+        config: q.config || {},
+        options: (q.options || []).map((o, idx) => ({
+          position: idx,
+          bodyMd: o.bodyMd,
+          isCorrect: !!o.isCorrect,
+          feedbackMd: o.feedbackMd || null,
+        })),
+      };
+      const res = await api.post('/questions', payload);
+      updateQuestion(qIdx, { questionVersionId: res.versionId });
+      const bList = await api.get('/questions').catch(() => []);
+      setBankQuestions(bList);
+      setSuccessMsg(`Exercise ${qIdx + 1} saved to Question Bank.`);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   // Save Exam & Questions
   async function handleSave(publish = false) {
     if (!exam.courseId) {
@@ -387,7 +419,33 @@ export default function ExamPaperEditor() {
         return;
       }
 
-      setSuccessMsg('Exam paper saved successfully.');
+      // Reload exam questions so newly created questions get their questionVersionId, and refresh bank
+      const [refreshedExam, bList] = await Promise.all([
+        api.get(`/exams/${savedExamId}`),
+        api.get('/questions').catch(() => []),
+      ]);
+      if (refreshedExam?.questions) {
+        setQuestions(
+          refreshedExam.questions.map((q) => ({
+            questionVersionId: q.question_version_id,
+            categoryId: q.category_id || '',
+            typeCode: q.type_code,
+            bodyMd: q.body_md,
+            explanationMd: q.explanation_md ?? '',
+            points: parseFloat(q.points),
+            config: q.config || {},
+            options: (q.options || []).map((o) => ({
+              id: o.id,
+              bodyMd: o.body_md,
+              isCorrect: o.is_correct,
+              feedbackMd: o.feedback_md,
+            })),
+          }))
+        );
+      }
+      setBankQuestions(bList);
+
+      setSuccessMsg('Exam paper saved and questions synced to Question Bank.');
       if (!id) {
         navigate(`/app/exams/${savedExamId}/edit`, { replace: true });
       }
@@ -964,8 +1022,25 @@ export default function ExamPaperEditor() {
                 </div>
               </div>
 
-              {/* Question Actions Toolbar (Reorder / Delete) */}
-              <div className="mt-2 flex items-center justify-end gap-1 text-slate-400">
+              {/* Question Actions Toolbar (Bank Sync / Reorder / Delete) */}
+              <div className="mt-2 flex items-center justify-between gap-2 text-slate-400">
+                <div>
+                  {q.questionVersionId ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10.5px] font-medium text-emerald-700">
+                      <CheckCircle2 size={11} /> In Question Bank
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => saveQuestionToBank(idx)}
+                      className="inline-flex items-center gap-1 rounded border border-mark/30 bg-mark-tint/50 px-2 py-0.5 text-[10.5px] font-medium text-mark hover:bg-mark-tint transition-colors"
+                      title="Save this question to your Question Bank immediately"
+                    >
+                      <Library size={11} /> Save to Bank
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
                 <button
                   type="button"
                   title="Move Up"
@@ -992,6 +1067,7 @@ export default function ExamPaperEditor() {
                 >
                   <Trash2 size={13} />
                 </button>
+                </div>
               </div>
             </div>
           );
