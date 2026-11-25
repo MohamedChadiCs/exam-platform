@@ -326,6 +326,41 @@ examsRouter.post('/:id/close', async (req, res) => {
   res.json({ success: true, data: rows[0] });
 });
 
+examsRouter.post('/:id/archive', async (req, res) => {
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  const { rows } = await query(
+    `UPDATE exams SET status = 'ARCHIVED', updated_at = now()
+      WHERE id = $1 AND (owner_id = $2 OR $3 = 'ADMIN') AND status != 'ARCHIVED'
+      RETURNING *`,
+    [id, req.auth.user.id, req.auth.user.role]
+  );
+  if (!rows[0]) throw AppError.badRequest('Exam not found or already archived');
+  await audit({ actorId: req.auth.user.id, action: 'EXAM_ARCHIVED', entityType: 'exam', entityId: id, ip: req.ip });
+  res.json({ success: true, data: rows[0] });
+});
+
+examsRouter.post('/:id/unarchive', async (req, res) => {
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  const { rows } = await query(
+    `UPDATE exams
+        SET status = CASE
+              WHEN EXISTS (
+                SELECT 1 FROM exam_sessions s
+                JOIN exam_enrollments en ON en.id = s.enrollment_id
+                WHERE en.exam_id = $1
+              ) THEN 'CLOSED'
+              ELSE 'DRAFT'
+            END,
+            updated_at = now()
+      WHERE id = $1 AND (owner_id = $2 OR $3 = 'ADMIN') AND status = 'ARCHIVED'
+      RETURNING *`,
+    [id, req.auth.user.id, req.auth.user.role]
+  );
+  if (!rows[0]) throw AppError.badRequest('Exam not found or not archived');
+  await audit({ actorId: req.auth.user.id, action: 'EXAM_UNARCHIVED', entityType: 'exam', entityId: id, ip: req.ip });
+  res.json({ success: true, data: rows[0] });
+});
+
 // ==========================================
 // Access Codes & QR Generation
 // ==========================================

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Plus, QrCode, BookOpen, Clock, Users, CheckCircle, FileText, Share2, Play, Lock, Edit3, Search, X } from 'lucide-react';
+import { Plus, QrCode, BookOpen, Clock, Users, CheckCircle, FileText, Share2, Play, Lock, Edit3, Search, X, Archive, RotateCcw } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
 import { useConfirm } from '../lib/ConfirmContext';
@@ -57,7 +57,7 @@ export default function Exams() {
     setError('');
     try {
       const [exRes, coRes] = await Promise.all([
-        api.get('/exams'),
+        api.get('/exams?status=ALL'),
         api.get('/academic/courses'),
       ]);
       setExams(exRes);
@@ -144,6 +144,31 @@ export default function Exams() {
     if (!ok) return;
     try {
       await api.post(`/exams/${id}/close`);
+      loadData();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleArchive(id) {
+    const ok = await confirm({
+      title: t('exams.archiveTitle', 'Archive Exam'),
+      message: t('exams.archiveConfirm', 'Archive this exam? It will be moved out of your active exams list and can be restored anytime from the Archived tab.'),
+      confirmLabel: t('exams.archive', 'Archive'),
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.post(`/exams/${id}/archive`);
+      loadData();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleUnarchive(id) {
+    try {
+      await api.post(`/exams/${id}/unarchive`);
       loadData();
     } catch (err) {
       setError(err.message);
@@ -239,6 +264,7 @@ export default function Exams() {
   }
 
   const filteredExams = exams.filter((ex) => {
+    if (statusFilter === 'ALL' && ex.status === 'ARCHIVED') return false;
     if (statusFilter !== 'ALL' && ex.status !== statusFilter) return false;
     if (courseFilter && ex.course_id !== courseFilter) return false;
     if (search.trim()) {
@@ -378,7 +404,8 @@ export default function Exams() {
                       </span>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         ex.status === 'PUBLISHED' ? 'bg-ok-tint text-ok' :
-                        ex.status === 'DRAFT' ? 'bg-paper text-ink-soft' : 'bg-pen-tint text-pen'
+                        ex.status === 'DRAFT' ? 'bg-paper text-ink-soft' :
+                        ex.status === 'ARCHIVED' ? 'bg-slate-100 text-slate-600' : 'bg-pen-tint text-pen'
                       }`}>
                         {ex.status}
                       </span>
@@ -431,6 +458,24 @@ export default function Exams() {
                     <Link to={`/app/exams/${ex.id}/submissions`} className="btn-quiet text-xs py-1.5 px-3">
                       <Users size={14} /> {t('exams.submissions', 'Submissions')} ({ex.session_count ?? 0})
                     </Link>
+
+                    {ex.status !== 'ARCHIVED' ? (
+                      <button
+                        onClick={() => handleArchive(ex.id)}
+                        className="btn-quiet text-xs py-1.5 px-3 text-ink-soft hover:text-pen"
+                        title={t('exams.archive', 'Archive')}
+                      >
+                        <Archive size={14} /> {t('exams.archive', 'Archive')}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleUnarchive(ex.id)}
+                        className="btn-quiet text-xs py-1.5 px-3 text-mark"
+                        title={t('exams.restore', 'Restore')}
+                      >
+                        <RotateCcw size={14} /> {t('exams.restore', 'Restore')}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
