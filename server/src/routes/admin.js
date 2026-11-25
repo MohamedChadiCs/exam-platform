@@ -89,10 +89,16 @@ adminRouter.post('/professors/:id/verify', async (req, res) => {
 
 adminRouter.post('/students/:id/approve', async (req, res) => {
   const { id } = idParam.parse(req.params);
-  const { rowCount } = await query(
-    'UPDATE students SET verified_at=now(), verified_by=$2 WHERE user_id=$1', [id, req.auth.user.id]);
-  if (!rowCount) throw AppError.notFound('Student not found');
-  await audit({ actorId: req.auth.user.id, action: 'STUDENT_APPROVED', entityType: 'user', entityId: id, ip: req.ip });
+  await withTx(async (db) => {
+    const { rowCount } = await db.query(
+      'UPDATE students SET verified_at=now(), verified_by=$2 WHERE user_id=$1', [id, req.auth.user.id]);
+    if (!rowCount) throw AppError.notFound('Student not found');
+    // Also activate the user account if still PENDING_EMAIL
+    await db.query(
+      `UPDATE users SET status='ACTIVE', email_verified_at=COALESCE(email_verified_at, now()), updated_at=now()
+       WHERE id=$1 AND status='PENDING_EMAIL'`, [id]);
+    await audit({ actorId: req.auth.user.id, action: 'STUDENT_APPROVED', entityType: 'user', entityId: id, ip: req.ip }, db);
+  });
   res.json({ success: true, data: { id, approved: true } });
 });
 

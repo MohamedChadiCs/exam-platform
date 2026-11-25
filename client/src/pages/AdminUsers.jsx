@@ -144,7 +144,7 @@ export default function AdminUsers() {
                             {u.verified_at && (
                               <BadgeCheck size={16} className="text-mark shrink-0" aria-label={t('admin.verified')} />
                             )}
-                            {u.role === 'STUDENT' && !u.verified_at && u.status === 'ACTIVE' && (
+                            {u.role === 'STUDENT' && !u.verified_at && u.status !== 'ARCHIVED' && u.status !== 'SUSPENDED' && (
                               <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                                 {t('admin.pendingApproval', 'Pending')}
                               </span>
@@ -197,7 +197,7 @@ export default function AdminUsers() {
                               {t('admin.verify')}
                             </button>
                           )}
-                          {u.role === 'STUDENT' && !u.verified_at && u.status === 'ACTIVE' && (
+                          {u.role === 'STUDENT' && !u.verified_at && u.status !== 'ARCHIVED' && u.status !== 'SUSPENDED' && (
                             <button
                               className="btn-quiet btn-sm text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
                               onClick={() => act(`/admin/students/${u.id}/approve`)}
