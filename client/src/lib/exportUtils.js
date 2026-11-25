@@ -2,11 +2,19 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-function safeFilename(name) {
-  return String(name || 'export')
+export function sanitizeFilename(name, fallback = 'export') {
+  const cleaned = String(name || '')
     .trim()
-    .replace(/[^a-zA-Z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '') || 'export';
+    .replace(/[<>:"/\\|?*]+/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned || fallback;
+}
+
+function ensureExtension(filename, ext) {
+  const base = sanitizeFilename(filename);
+  const suffix = `.${ext}`;
+  return base.toLowerCase().endsWith(suffix) ? base : `${base}${suffix}`;
 }
 
 function getIntegrityLabel(s) {
@@ -34,62 +42,83 @@ function computeGradeStats(submissions) {
   return { total: submissions.length, gradedCount: graded.length, passedCount, failedCount, avgScore, avgPct };
 }
 
-export function exportGradesToExcel(exam, submissions) {
-  const rows = submissions.map((s, idx) => ({
-    '#': idx + 1,
-    Matricule: s.matricule || '',
-    'Last Name': s.last_name || '',
-    'First Name': s.first_name || '',
-    Email: s.email || '',
-    Attempt: s.attempt_no ?? 1,
-    Score: s.total_score !== null && s.total_score !== undefined ? Number(s.total_score) : '',
-    'Max Score': exam?.max_score !== undefined ? Number(exam.max_score) : '',
-    'Percentage (%)': s.percentage !== null && s.percentage !== undefined ? Number(s.percentage) : '',
-    Result: getResultLabel(s),
-    Integrity: getIntegrityLabel(s),
-    'Submitted At': s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '',
-  }));
+export function exportGradesToExcel(exam, submissions, { filename, variant = 'detailed' } = {}) {
+  const isShort = variant === 'short';
 
-  const stats = computeGradeStats(submissions);
-  const infoRows = [
-    { Field: 'Exam Title', Value: exam?.title || '' },
-    { Field: 'Course', Value: exam?.course_code ? `${exam.course_code} - ${exam.course_name || ''}` : '' },
-    { Field: 'Max Score', Value: exam?.max_score ?? '' },
-    { Field: 'Passing Score', Value: exam?.passing_score ?? '' },
-    { Field: 'Total Submissions', Value: stats.total },
-    { Field: 'Passed', Value: stats.passedCount },
-    { Field: 'Failed', Value: stats.failedCount },
-    { Field: 'Average Score', Value: `${stats.avgScore} (${stats.avgPct}%)` },
-    { Field: 'Exported At', Value: new Date().toLocaleString() },
-  ];
+  const rows = isShort
+    ? submissions.map((s) => ({
+        Matricule: s.matricule || '',
+        'First Name': s.first_name || '',
+        'Last Name': s.last_name || '',
+        Note: s.total_score !== null && s.total_score !== undefined ? Number(s.total_score) : '',
+        Status: getResultLabel(s),
+      }))
+    : submissions.map((s, idx) => ({
+        '#': idx + 1,
+        Matricule: s.matricule || '',
+        'Last Name': s.last_name || '',
+        'First Name': s.first_name || '',
+        Email: s.email || '',
+        Attempt: s.attempt_no ?? 1,
+        Score: s.total_score !== null && s.total_score !== undefined ? Number(s.total_score) : '',
+        'Max Score': exam?.max_score !== undefined ? Number(exam.max_score) : '',
+        'Percentage (%)': s.percentage !== null && s.percentage !== undefined ? Number(s.percentage) : '',
+        Result: getResultLabel(s),
+        Integrity: getIntegrityLabel(s),
+        'Submitted At': s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '',
+      }));
 
   const wb = XLSX.utils.book_new();
   const gradesSheet = XLSX.utils.json_to_sheet(rows);
-  gradesSheet['!cols'] = [
-    { wch: 5 },  // #
-    { wch: 14 }, // Matricule
-    { wch: 16 }, // Last Name
-    { wch: 16 }, // First Name
-    { wch: 26 }, // Email
-    { wch: 9 },  // Attempt
-    { wch: 10 }, // Score
-    { wch: 11 }, // Max Score
-    { wch: 15 }, // Percentage
-    { wch: 13 }, // Result
-    { wch: 30 }, // Integrity
-    { wch: 22 }, // Submitted At
-  ];
+  gradesSheet['!cols'] = isShort
+    ? [
+        { wch: 16 }, // Matricule
+        { wch: 18 }, // First Name
+        { wch: 18 }, // Last Name
+        { wch: 10 }, // Note
+        { wch: 14 }, // Status
+      ]
+    : [
+        { wch: 5 },  // #
+        { wch: 14 }, // Matricule
+        { wch: 16 }, // Last Name
+        { wch: 16 }, // First Name
+        { wch: 26 }, // Email
+        { wch: 9 },  // Attempt
+        { wch: 10 }, // Score
+        { wch: 11 }, // Max Score
+        { wch: 15 }, // Percentage
+        { wch: 13 }, // Result
+        { wch: 30 }, // Integrity
+        { wch: 22 }, // Submitted At
+      ];
   XLSX.utils.book_append_sheet(wb, gradesSheet, 'Grades');
 
-  const infoSheet = XLSX.utils.json_to_sheet(infoRows);
-  infoSheet['!cols'] = [{ wch: 20 }, { wch: 45 }];
-  XLSX.utils.book_append_sheet(wb, infoSheet, 'Summary');
+  if (!isShort) {
+    const stats = computeGradeStats(submissions);
+    const infoRows = [
+      { Field: 'Exam Title', Value: exam?.title || '' },
+      { Field: 'Course', Value: exam?.course_code ? `${exam.course_code} - ${exam.course_name || ''}` : '' },
+      { Field: 'Max Score', Value: exam?.max_score ?? '' },
+      { Field: 'Passing Score', Value: exam?.passing_score ?? '' },
+      { Field: 'Total Submissions', Value: stats.total },
+      { Field: 'Passed', Value: stats.passedCount },
+      { Field: 'Failed', Value: stats.failedCount },
+      { Field: 'Average Score', Value: `${stats.avgScore} (${stats.avgPct}%)` },
+      { Field: 'Exported At', Value: new Date().toLocaleString() },
+    ];
+    const infoSheet = XLSX.utils.json_to_sheet(infoRows);
+    infoSheet['!cols'] = [{ wch: 20 }, { wch: 45 }];
+    XLSX.utils.book_append_sheet(wb, infoSheet, 'Summary');
+  }
 
-  XLSX.writeFile(wb, `${safeFilename(exam?.title || 'exam')}_grades.xlsx`);
+  const defaultName = `${sanitizeFilename(exam?.title || 'exam')}_grades_${variant}`;
+  XLSX.writeFile(wb, ensureExtension(filename || defaultName, 'xlsx'));
 }
 
-export function exportGradesToPdf(exam, submissions) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+export function exportGradesToPdf(exam, submissions, { filename, variant = 'detailed' } = {}) {
+  const isShort = variant === 'short';
+  const doc = new jsPDF({ orientation: isShort ? 'portrait' : 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const stats = computeGradeStats(submissions);
 
@@ -97,7 +126,7 @@ export function exportGradesToPdf(exam, submissions) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(15, 23, 42);
-  doc.text(exam?.title || 'Grade List', 40, 42);
+  doc.text(`${exam?.title || 'Grade List'}${isShort ? ' (Short)' : ''}`, 40, 42);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
@@ -108,41 +137,69 @@ export function exportGradesToPdf(exam, submissions) {
   doc.text(courseLine, 40, 60);
 
   doc.setFontSize(9);
-  doc.text(
-    `Max Score: ${exam?.max_score ?? '—'} pts   |   Passing Score: ${exam?.passing_score ?? '—'} pts   |   Total: ${stats.total}   |   Passed: ${stats.passedCount}   |   Failed: ${stats.failedCount}   |   Average: ${stats.avgScore} pts (${stats.avgPct}%)`,
-    40,
-    76
-  );
-  doc.text(`Exported: ${new Date().toLocaleString()}`, pageWidth - 40, 42, { align: 'right' });
+  if (isShort) {
+    doc.text(
+      `Max Score: ${exam?.max_score ?? '—'} pts   |   Passing: ${exam?.passing_score ?? '—'} pts   |   Total: ${stats.total}`,
+      40,
+      76
+    );
+  } else {
+    doc.text(
+      `Max Score: ${exam?.max_score ?? '—'} pts   |   Passing Score: ${exam?.passing_score ?? '—'} pts   |   Total: ${stats.total}   |   Passed: ${stats.passedCount}   |   Failed: ${stats.failedCount}   |   Average: ${stats.avgScore} pts (${stats.avgPct}%)`,
+      40,
+      76
+    );
+  }
+  doc.text(`Exported: ${new Date().toLocaleDateString()}`, pageWidth - 40, 42, { align: 'right' });
 
-  const body = submissions.map((s, idx) => [
-    String(idx + 1),
-    s.matricule || '—',
-    `${s.first_name || ''} ${s.last_name || ''}`.trim() || '—',
-    s.email || '—',
-    s.total_score !== null && s.total_score !== undefined ? `${s.total_score} / ${exam?.max_score ?? ''}` : '—',
-    s.percentage !== null && s.percentage !== undefined ? `${s.percentage}%` : '—',
-    getResultLabel(s),
-    getIntegrityLabel(s),
-  ]);
+  const head = isShort
+    ? [['Matricule', 'First Name', 'Last Name', 'Note', 'Status']]
+    : [['#', 'Matricule', 'Student', 'Email', 'Score', '%', 'Result', 'Integrity']];
+
+  const body = isShort
+    ? submissions.map((s) => [
+        s.matricule || '—',
+        s.first_name || '—',
+        s.last_name || '—',
+        s.total_score !== null && s.total_score !== undefined ? `${s.total_score} / ${exam?.max_score ?? ''}` : '—',
+        getResultLabel(s),
+      ])
+    : submissions.map((s, idx) => [
+        String(idx + 1),
+        s.matricule || '—',
+        `${s.first_name || ''} ${s.last_name || ''}`.trim() || '—',
+        s.email || '—',
+        s.total_score !== null && s.total_score !== undefined ? `${s.total_score} / ${exam?.max_score ?? ''}` : '—',
+        s.percentage !== null && s.percentage !== undefined ? `${s.percentage}%` : '—',
+        getResultLabel(s),
+        getIntegrityLabel(s),
+      ]);
+
+  const statusColIndex = isShort ? 4 : 6;
 
   autoTable(doc, {
     startY: 92,
-    head: [['#', 'Matricule', 'Student', 'Email', 'Score', '%', 'Result', 'Integrity']],
+    head,
     body,
     theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 5, textColor: [30, 41, 59] },
+    styles: { fontSize: isShort ? 9.5 : 8.5, cellPadding: isShort ? 6 : 5, textColor: [30, 41, 59] },
     headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: {
-      0: { cellWidth: 28, halign: 'center' },
-      1: { cellWidth: 80 },
-      4: { halign: 'center' },
-      5: { halign: 'center' },
-      6: { halign: 'center' },
-    },
+    columnStyles: isShort
+      ? {
+          0: { cellWidth: 95 },
+          3: { halign: 'center', cellWidth: 75 },
+          4: { halign: 'center', cellWidth: 80 },
+        }
+      : {
+          0: { cellWidth: 28, halign: 'center' },
+          1: { cellWidth: 80 },
+          4: { halign: 'center' },
+          5: { halign: 'center' },
+          6: { halign: 'center' },
+        },
     didParseCell(data) {
-      if (data.section === 'body' && data.column.index === 6) {
+      if (data.section === 'body' && data.column.index === statusColIndex) {
         if (data.cell.raw === 'Passed') {
           data.cell.styles.textColor = [21, 128, 61];
           data.cell.styles.fontStyle = 'bold';
@@ -151,7 +208,7 @@ export function exportGradesToPdf(exam, submissions) {
           data.cell.styles.fontStyle = 'bold';
         }
       }
-      if (data.section === 'body' && data.column.index === 7 && String(data.cell.raw).includes('Fullscreen')) {
+      if (!isShort && data.section === 'body' && data.column.index === 7 && String(data.cell.raw).includes('Fullscreen')) {
         data.cell.styles.textColor = [185, 28, 28];
         data.cell.styles.fontStyle = 'bold';
       }
@@ -171,7 +228,8 @@ export function exportGradesToPdf(exam, submissions) {
     );
   }
 
-  doc.save(`${safeFilename(exam?.title || 'exam')}_grades.pdf`);
+  const defaultName = `${sanitizeFilename(exam?.title || 'exam')}_grades_${variant}`;
+  doc.save(ensureExtension(filename || defaultName, 'pdf'));
 }
 
 const QUESTION_TYPE_LABELS = {
@@ -188,7 +246,21 @@ const QUESTION_TYPE_LABELS = {
   CODE: 'Programming / Code',
 };
 
-export function exportExamPaperToPdf(examData, selectedCourse = null) {
+const OPEN_SPACE_TYPES = new Set(['ESSAY', 'LONG_TEXT', 'SHORT_TEXT', 'CODE']);
+
+function drawDottedLines(doc, x1, x2, startY, count, spacing = 18) {
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineDashPattern([1.5, 2.5], 0);
+  let currentY = startY;
+  for (let i = 0; i < count; i++) {
+    currentY += spacing;
+    doc.line(x1, currentY, x2, currentY);
+  }
+  doc.setLineDashPattern([], 0);
+  return currentY;
+}
+
+export function exportExamPaperToPdf(examData, selectedCourse = null, { filename } = {}) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -286,6 +358,8 @@ export function exportExamPaperToPdf(examData, selectedCourse = null) {
     y += boxHeight + 16;
   }
 
+  const openSpaceExercises = [];
+
   // Exercises
   rawQuestions.forEach((q, idx) => {
     const typeCode = q.typeCode || q.type_code || 'MCQ_SINGLE';
@@ -369,9 +443,10 @@ export function exportExamPaperToPdf(examData, selectedCourse = null) {
       doc.text('Answer: ___________________________________', margin + 8, y + 6);
       y += 22;
     } else if (typeCode === 'CODE') {
+      openSpaceExercises.push({ number: idx + 1, typeCode, typeLabel, points });
       const codeLines = config.starterCode ? doc.splitTextToSize(config.starterCode, contentWidth - 20) : [];
       const boxH = Math.max(70, codeLines.length * 12 + 30);
-      ensureSpace(boxH + 8);
+      ensureSpace(boxH + 20);
       doc.setDrawColor(203, 213, 225);
       doc.setFillColor(248, 250, 252);
       doc.roundedRect(margin, y, contentWidth, boxH, 3, 3, 'FD');
@@ -381,21 +456,86 @@ export function exportExamPaperToPdf(examData, selectedCourse = null) {
         doc.setTextColor(51, 65, 85);
         doc.text(codeLines, margin + 10, y + 14);
       }
-      y += boxH + 8;
+      y += boxH + 10;
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text('(Use the attached dotted answer sheet for your code solution)', margin, y);
+      y += 8;
     } else {
-      // SHORT_TEXT / LONG_TEXT / ESSAY / FILL_BLANK answer lines
-      const lineCount = typeCode === 'ESSAY' || typeCode === 'LONG_TEXT' ? 6 : 3;
-      ensureSpace(lineCount * 18 + 6);
-      doc.setDrawColor(203, 213, 225);
-      for (let l = 0; l < lineCount; l++) {
-        y += 16;
-        doc.line(margin, y, pageWidth - margin, y);
+      if (OPEN_SPACE_TYPES.has(typeCode)) {
+        openSpaceExercises.push({ number: idx + 1, typeCode, typeLabel, points });
+      }
+      const lineCount = typeCode === 'ESSAY' || typeCode === 'LONG_TEXT' ? 5 : 3;
+      ensureSpace(lineCount * 18 + 18);
+      y = drawDottedLines(doc, margin, pageWidth - margin, y, lineCount, 17);
+      if (OPEN_SPACE_TYPES.has(typeCode)) {
+        y += 12;
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text('(Additional dotted answer sheet attached at the end)', margin, y);
       }
       y += 6;
     }
 
     y += 14;
   });
+
+  // Additional Dotted Answer Paper for open-space questions (Essay, Long/Short Text, Code)
+  if (openSpaceExercises.length > 0) {
+    doc.addPage();
+    y = margin;
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${title.toUpperCase()} — ANSWER SHEET`, pageWidth / 2, y, { align: 'center' });
+    y += 14;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Dotted Answer Paper for Open-Ended & Programming Exercises', pageWidth / 2, y, { align: 'center' });
+    y += 14;
+
+    // Student info box on answer sheet
+    doc.setDrawColor(148, 163, 184);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, y, contentWidth, 30, 3, 3, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    doc.text('Student Name: ___________________________', margin + 12, y + 19);
+    doc.text('Matricule: _______________', margin + 275, y + 19);
+    y += 46;
+
+    openSpaceExercises.forEach((ex, exIdx) => {
+      const isLarge = ex.typeCode === 'ESSAY' || ex.typeCode === 'LONG_TEXT' || ex.typeCode === 'CODE';
+      const linesPerExercise = isLarge ? 16 : 9;
+      const neededHeight = 24 + linesPerExercise * 18;
+      if (exIdx > 0 && y + neededHeight > pageHeight - 48) {
+        doc.addPage();
+        y = margin;
+      }
+
+      doc.setFont('times', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`Exercise ${ex.number} — ${ex.typeLabel}`, margin, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`[ ${ex.points} pts ]`, pageWidth - margin, y, { align: 'right' });
+      y += 6;
+
+      // Fill remaining space up to linesPerExercise without overflowing page
+      const maxLinesFit = Math.max(4, Math.floor((pageHeight - 52 - y) / 18));
+      const count = Math.min(linesPerExercise, maxLinesFit);
+      y = drawDottedLines(doc, margin, pageWidth - margin, y, count, 18);
+      y += 22;
+    });
+  }
 
   // Page numbers
   const pageCount = doc.internal.getNumberOfPages();
@@ -407,5 +547,6 @@ export function exportExamPaperToPdf(examData, selectedCourse = null) {
     doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 22, { align: 'center' });
   }
 
-  doc.save(`${safeFilename(title)}_paper.pdf`);
+  const defaultName = `${sanitizeFilename(title)}_paper`;
+  doc.save(ensureExtension(filename || defaultName, 'pdf'));
 }

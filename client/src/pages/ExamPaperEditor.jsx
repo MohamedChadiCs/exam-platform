@@ -6,7 +6,8 @@ import {
   CheckCircle2, Clock, Award, BookOpen, Library, HelpCircle, FileText, Tag, FolderPlus, FileDown
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { exportExamPaperToPdf } from '../lib/exportUtils';
+import { exportExamPaperToPdf, sanitizeFilename } from '../lib/exportUtils';
+import ExportModal from '../components/ExportModal';
 import Alert from '../components/Alert';
 import CodeMorph from '../components/CodeMorph';
 
@@ -44,6 +45,7 @@ export default function ExamPaperEditor() {
   const [inlineCatName, setInlineCatName] = useState('');
   const [showInlineCatFor, setShowInlineCatFor] = useState(null); // question index or null
   const [paperViewMode, setPaperViewMode] = useState('single'); // 'single' | 'double'
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Exam Paper State
   const [exam, setExam] = useState({
@@ -521,7 +523,7 @@ export default function ExamPaperEditor() {
 
             <button
               type="button"
-              onClick={() => exportExamPaperToPdf({ ...exam, questions }, selectedCourse)}
+              onClick={() => setShowExportModal(true)}
               className="btn-quiet text-xs py-1.5 px-3"
               title="Export exam paper as PDF"
             >
@@ -1536,6 +1538,18 @@ export default function ExamPaperEditor() {
           </div>
         </div>
       )}
+
+      <ExportModal
+        open={showExportModal}
+        title="Export Exam Paper (PDF)"
+        defaultFilename={`${sanitizeFilename(exam.title || 'exam')}_paper`}
+        extension="pdf"
+        onClose={() => setShowExportModal(false)}
+        onConfirm={({ filename }) => {
+          exportExamPaperToPdf({ ...exam, questions }, selectedCourse, { filename });
+          setShowExportModal(false);
+        }}
+      />
     </div>
   );
 }

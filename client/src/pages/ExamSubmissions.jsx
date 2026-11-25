@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Send, Eye, ShieldAlert, FileSpreadsheet, FileDown } from 'lucide-react';
 import { api } from '../lib/api';
-import { exportGradesToExcel, exportGradesToPdf } from '../lib/exportUtils';
+import { exportGradesToExcel, exportGradesToPdf, sanitizeFilename } from '../lib/exportUtils';
+import ExportModal from '../components/ExportModal';
 import Alert from '../components/Alert';
 import { useConfirm } from '../lib/ConfirmContext';
 import CodeMorph from '../components/CodeMorph';
@@ -21,6 +22,7 @@ export default function ExamSubmissions() {
   const [activeSession, setActiveSession] = useState(null);
   const [sessionDetail, setSessionDetail] = useState(null);
   const [gradingState, setGradingState] = useState({});
+  const [exportFormat, setExportFormat] = useState(null); // 'xlsx' | 'pdf' | null
 
   async function loadData() {
     setLoading(true);
@@ -116,7 +118,7 @@ export default function ExamSubmissions() {
           <button
             type="button"
             disabled={submissions.length === 0}
-            onClick={() => exportGradesToExcel(exam, submissions)}
+            onClick={() => setExportFormat('xlsx')}
             className="btn-quiet text-xs"
           >
             <FileSpreadsheet size={14} /> {t('submissions.exportExcel', 'Export Excel')}
@@ -124,7 +126,7 @@ export default function ExamSubmissions() {
           <button
             type="button"
             disabled={submissions.length === 0}
-            onClick={() => exportGradesToPdf(exam, submissions)}
+            onClick={() => setExportFormat('pdf')}
             className="btn-quiet text-xs"
           >
             <FileDown size={14} /> {t('submissions.exportPdf', 'Export PDF')}
@@ -474,6 +476,23 @@ export default function ExamSubmissions() {
           </div>
         </div>
       )}
+
+      <ExportModal
+        open={Boolean(exportFormat)}
+        title={exportFormat === 'xlsx' ? 'Export Grade List (Excel)' : 'Export Grade List (PDF)'}
+        defaultFilename={`${sanitizeFilename(exam?.title || 'exam')}_grades`}
+        extension={exportFormat || 'pdf'}
+        showVariant
+        onClose={() => setExportFormat(null)}
+        onConfirm={({ filename, variant }) => {
+          if (exportFormat === 'xlsx') {
+            exportGradesToExcel(exam, submissions, { filename, variant });
+          } else {
+            exportGradesToPdf(exam, submissions, { filename, variant });
+          }
+          setExportFormat(null);
+        }}
+      />
     </div>
   );
 }

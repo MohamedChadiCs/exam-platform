@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Plus, QrCode, BookOpen, Clock, Users, CheckCircle, FileText, Share2, Play, Lock, Edit3, Search, X, Archive, RotateCcw, FileDown } from 'lucide-react';
 import { api } from '../lib/api';
-import { exportExamPaperToPdf } from '../lib/exportUtils';
+import { exportExamPaperToPdf, sanitizeFilename } from '../lib/exportUtils';
+import ExportModal from '../components/ExportModal';
 import Alert from '../components/Alert';
 import { useConfirm } from '../lib/ConfirmContext';
 
@@ -15,6 +16,7 @@ export default function Exams() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exportingExamId, setExportingExamId] = useState(null);
+  const [exportExamData, setExportExamData] = useState(null);
 
   // Filters state
   const [search, setSearch] = useState('');
@@ -469,8 +471,10 @@ export default function Exams() {
                         setError('');
                         try {
                           const fullExam = await api.get(`/exams/${ex.id}`);
-                          const course = courses.find((c) => c.id === ex.course_id);
-                          exportExamPaperToPdf(fullExam, course);
+                          setExportExamData({
+                            fullExam,
+                            course: courses.find((c) => c.id === ex.course_id),
+                          });
                         } catch (err) {
                           setError(err.message);
                         } finally {
@@ -787,6 +791,20 @@ export default function Exams() {
           </div>
         </div>
       )}
+
+      <ExportModal
+        open={Boolean(exportExamData)}
+        title="Export Exam Paper (PDF)"
+        defaultFilename={`${sanitizeFilename(exportExamData?.fullExam?.title || 'exam')}_paper`}
+        extension="pdf"
+        onClose={() => setExportExamData(null)}
+        onConfirm={({ filename }) => {
+          if (exportExamData) {
+            exportExamPaperToPdf(exportExamData.fullExam, exportExamData.course, { filename });
+          }
+          setExportExamData(null);
+        }}
+      />
     </div>
   );
 }
