@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Users, Building, BookOpen, HelpCircle, FileText, KeyRound, Play, Award,
-  ArrowRight, Sparkles, CheckCircle2, Clock
+  ArrowRight, Sparkles, CheckCircle2, Clock, ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import Alert from '../components/Alert';
 
 const MODULES = {
   ADMIN: [
@@ -50,6 +51,25 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Student Approval Banner */}
+      {user.role === 'STUDENT' && !user.isApproved && (
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <ShieldAlert size={22} />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-amber-900">
+                {t('approval.bannerTitle', 'Account Pending Approval')}
+              </h3>
+              <p className="mt-1 text-sm text-amber-800">
+                {t('approval.bannerBody', 'Your student account is registered but an administrator must approve it before you can access examinations. Please contact your department.')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modules Section */}
       <div className="space-y-4">

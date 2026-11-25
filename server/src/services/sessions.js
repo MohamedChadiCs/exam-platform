@@ -24,10 +24,13 @@ export const revokeAllForUser = (userId, db = { query }) =>
 export async function loadSession(token) {
   const idHash = sha256(token);
   const { rows } = await query(
-    `SELECT u.id, u.email, u.first_name, u.last_name, u.locale, u.status, r.code AS role
+    `SELECT u.id, u.email, u.first_name, u.last_name, u.locale, u.status, r.code AS role,
+            COALESCE(p.verified_at, st.verified_at) AS verified_at
        FROM auth_sessions s
        JOIN users u ON u.id = s.user_id
        JOIN roles r ON r.id = u.role_id
+       LEFT JOIN professors p ON p.user_id = u.id
+       LEFT JOIN students st ON st.user_id = u.id
       WHERE s.id_hash = $1
         AND s.revoked_at IS NULL
         AND s.expires_at > now()

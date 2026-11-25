@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { KeyRound, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { KeyRound, ArrowRight, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { api } from '../lib/api';
 import Alert from '../components/Alert';
+import { useAuth } from '../lib/AuthContext';
 
 export default function JoinExam() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
+  const notApproved = user?.role === 'STUDENT' && !user?.isApproved;
 
   async function handleJoin(e) {
     e.preventDefault();
@@ -42,6 +45,14 @@ export default function JoinExam() {
       </div>
 
       <div className="mt-8 rounded-xl border border-line bg-white p-6 shadow-sm">
+        {notApproved && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4">
+            <ShieldAlert size={20} className="mt-0.5 shrink-0 text-amber-600" />
+            <p className="text-sm text-amber-800">
+              {t('approval.notApproved', 'Your account has not been approved yet. Please wait for administrator approval.')}
+            </p>
+          </div>
+        )}
         {error && <div className="mb-4"><Alert variant="danger">{error}</Alert></div>}
 
         {success ? (
@@ -80,7 +91,7 @@ export default function JoinExam() {
 
             <button
               type="submit"
-              disabled={loading || code.trim().length < 6}
+              disabled={loading || code.trim().length < 6 || notApproved}
               className="btn-primary w-full py-3"
             >
               {loading ? t('common.loading') : t('join.submit', 'Enroll in Exam')}

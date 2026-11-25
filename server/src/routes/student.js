@@ -10,6 +10,24 @@ import { gradeSession } from '../services/grading.js';
 export const studentRouter = Router();
 studentRouter.use(requireAuth, requireRole('STUDENT'));
 
+async function requireApprovedStudent(req, res, next) {
+  try {
+    const { rows } = await query('SELECT verified_at FROM students WHERE user_id = $1', [req.auth.user.id]);
+    if (!rows[0]?.verified_at) {
+      throw new AppError(403, 'STUDENT_NOT_APPROVED', 'Your student account is pending administrator approval before you can access examination features.');
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+studentRouter.get('/approval-status', async (req, res) => {
+  const { rows } = await query('SELECT verified_at, verified_by FROM students WHERE user_id = $1', [req.auth.user.id]);
+  const isApproved = !!rows[0]?.verified_at;
+  res.json({ success: true, data: { isApproved, verifiedAt: rows[0]?.verified_at || null } });
+});
+
 // Helper for shuffling arrays
 function shuffle(array) {
   const arr = [...array];
@@ -62,7 +80,7 @@ function sanitizeConfigForStudent(typeCode, config) {
 // 1. Join Exam via Access Code
 // ==========================================
 
-studentRouter.post('/exams/join', async (req, res) => {
+studentRouter.post('/exams/join', requireApprovedStudent, async (req, res) => {
   const body = z.object({
     code: z.string().trim().min(6).max(64),
   }).parse(req.body);
@@ -176,7 +194,7 @@ studentRouter.post('/exams/join', async (req, res) => {
 // 2. Enrolled Exams List
 // ==========================================
 
-studentRouter.get('/exams', async (req, res) => {
+studentRouter.get('/exams', requireApprovedStudent, async (req, res) => {
   const studentId = req.auth.user.id;
 
   const { rows } = await query(
@@ -204,7 +222,7 @@ studentRouter.get('/exams', async (req, res) => {
 // 3. Start Exam Attempt
 // ==========================================
 
-studentRouter.post('/exams/:id/start', async (req, res) => {
+studentRouter.post('/exams/:id/start', requireApprovedStudent, async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
   const studentId = req.auth.user.id;
   const ip = req.ip;
@@ -325,7 +343,7 @@ studentRouter.post('/exams/:id/start', async (req, res) => {
 // 4. Active Session Details & Questions
 // ==========================================
 
-studentRouter.get('/sessions/:id', async (req, res) => {
+studentRouter.get('/sessions/:id', requireApprovedStudent, async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
   const studentId = req.auth.user.id;
 
@@ -426,7 +444,7 @@ studentRouter.get('/sessions/:id', async (req, res) => {
 // 5. Autosave Student Answer
 // ==========================================
 
-studentRouter.post('/sessions/:id/save', async (req, res) => {
+studentRouter.post('/sessions/:id/save', requireApprovedStudent, async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
   const body = z.object({
     questionVersionId: z.string().uuid(),
@@ -463,7 +481,7 @@ studentRouter.post('/sessions/:id/save', async (req, res) => {
 // 6. Submit Exam
 // ==========================================
 
-studentRouter.post('/sessions/:id/submit', async (req, res) => {
+studentRouter.post('/sessions/:id/submit', requireApprovedStudent, async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
   const studentId = req.auth.user.id;
 
@@ -509,7 +527,7 @@ studentRouter.post('/sessions/:id/submit', async (req, res) => {
 // 7. Integrity Monitoring (Security Events)
 // ==========================================
 
-studentRouter.post('/sessions/:id/security-event', async (req, res) => {
+studentRouter.post('/sessions/:id/security-event', requireApprovedStudent, async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
   const body = z.object({
     eventType: z.string().min(1).max(50),

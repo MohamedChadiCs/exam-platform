@@ -126,7 +126,15 @@
     "suspendHint": "Active sessions end immediately.",
     "archiveConfirm": "Archive this account? It cannot log in afterwards.",
     "archiveTitle": "Archive User",
-    "archiveItemTitle": "Archive Item"
+    "archiveItemTitle": "Archive Item",
+    "approveStudent": "Approve",
+    "revokeStudent": "Revoke",
+    "pendingApproval": "Pending"
+  },
+  "approval": {
+    "bannerTitle": "Account Pending Approval",
+    "bannerBody": "Your student account is registered but an administrator must approve it before you can access examinations. Please contact your department.",
+    "notApproved": "Your account has not been approved yet. Please wait for administrator approval."
   },
   "academic": {
     "title": "Academic Management",

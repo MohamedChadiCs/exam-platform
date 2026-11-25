@@ -26,8 +26,11 @@ adminRouter.get('/users', async (req, res) => {
   const f = listQuery.parse(req.query);
   const { rows } = await query(
     `SELECT u.id,u.email,u.first_name,u.last_name,r.code AS role,u.status,u.created_at,u.last_login_at,
-            u.suspension_reason,u.suspended_until,p.verified_at
-       FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN professors p ON p.user_id=u.id
+            u.suspension_reason,u.suspended_until,COALESCE(p.verified_at, st.verified_at) AS verified_at
+       FROM users u
+       JOIN roles r ON r.id=u.role_id
+       LEFT JOIN professors p ON p.user_id=u.id
+       LEFT JOIN students st ON st.user_id=u.id
       WHERE ($1::text IS NULL OR r.code=$1) AND ($2::text IS NULL OR u.status=$2)
         AND ($3::text IS NULL OR u.email ILIKE '%'||$3||'%' OR u.last_name ILIKE '%'||$3||'%')
       ORDER BY u.created_at DESC LIMIT $4 OFFSET $5`,
@@ -82,6 +85,24 @@ adminRouter.post('/professors/:id/verify', async (req, res) => {
   if (!rowCount) throw AppError.notFound('Professor not found');
   await audit({ actorId: req.auth.user.id, action: 'PROFESSOR_VERIFIED', entityType: 'user', entityId: id, ip: req.ip });
   res.json({ success: true, data: { id, verified: true } });
+});
+
+adminRouter.post('/students/:id/approve', async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const { rowCount } = await query(
+    'UPDATE students SET verified_at=now(), verified_by=$2 WHERE user_id=$1', [id, req.auth.user.id]);
+  if (!rowCount) throw AppError.notFound('Student not found');
+  await audit({ actorId: req.auth.user.id, action: 'STUDENT_APPROVED', entityType: 'user', entityId: id, ip: req.ip });
+  res.json({ success: true, data: { id, approved: true } });
+});
+
+adminRouter.post('/students/:id/revoke', async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const { rowCount } = await query(
+    'UPDATE students SET verified_at=NULL, verified_by=NULL WHERE user_id=$1', [id]);
+  if (!rowCount) throw AppError.notFound('Student not found');
+  await audit({ actorId: req.auth.user.id, action: 'STUDENT_REVOKED', entityType: 'user', entityId: id, ip: req.ip });
+  res.json({ success: true, data: { id, approved: false } });
 });
 
 adminRouter.get('/audit-logs', async (req, res) => {

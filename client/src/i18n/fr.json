@@ -126,7 +126,15 @@
     "suspendHint": "Les sessions actives prennent fin immédiatement.",
     "archiveConfirm": "Archiver ce compte ? Il ne pourra plus se connecter.",
     "archiveTitle": "Archiver l'utilisateur",
-    "archiveItemTitle": "Archiver l'élément"
+    "archiveItemTitle": "Archiver l'élément",
+    "approveStudent": "Approuver",
+    "revokeStudent": "Révoquer",
+    "pendingApproval": "En attente"
+  },
+  "approval": {
+    "bannerTitle": "Compte en attente d'approbation",
+    "bannerBody": "Votre compte étudiant est enregistré mais un administrateur doit l'approuver avant que vous puissiez accéder aux examens. Veuillez contacter votre département.",
+    "notApproved": "Votre compte n'a pas encore été approuvé. Veuillez attendre l'approbation de l'administrateur."
   },
   "academic": {
     "title": "Gestion académique",

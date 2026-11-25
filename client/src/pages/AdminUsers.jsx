@@ -144,6 +144,11 @@ export default function AdminUsers() {
                             {u.verified_at && (
                               <BadgeCheck size={16} className="text-mark shrink-0" aria-label={t('admin.verified')} />
                             )}
+                            {u.role === 'STUDENT' && !u.verified_at && u.status === 'ACTIVE' && (
+                              <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                {t('admin.pendingApproval', 'Pending')}
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-ink-soft font-mono" dir="ltr">{u.email}</div>
                           {u.status === 'SUSPENDED' && u.suspension_reason && (
@@ -190,6 +195,22 @@ export default function AdminUsers() {
                               onClick={() => act(`/admin/professors/${u.id}/verify`)}
                             >
                               {t('admin.verify')}
+                            </button>
+                          )}
+                          {u.role === 'STUDENT' && !u.verified_at && u.status === 'ACTIVE' && (
+                            <button
+                              className="btn-quiet btn-sm text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
+                              onClick={() => act(`/admin/students/${u.id}/approve`)}
+                            >
+                              {t('admin.approveStudent', 'Approve')}
+                            </button>
+                          )}
+                          {u.role === 'STUDENT' && u.verified_at && u.status === 'ACTIVE' && (
+                            <button
+                              className="btn-quiet btn-sm text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100"
+                              onClick={() => act(`/admin/students/${u.id}/revoke`)}
+                            >
+                              {t('admin.revokeStudent', 'Revoke')}
                             </button>
                           )}
                           {u.status !== 'ARCHIVED' && (

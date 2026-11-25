@@ -48,7 +48,15 @@ async function issueToken(userId, purpose, ttlMinutes, db = { query }) {
 }
 
 const publicUser = (u) => ({
-  id: u.id, email: u.email, firstName: u.first_name, lastName: u.last_name, locale: u.locale, role: u.role,
+  id: u.id,
+  email: u.email,
+  firstName: u.first_name,
+  lastName: u.last_name,
+  locale: u.locale,
+  role: u.role,
+  verifiedAt: u.verified_at || null,
+  isApproved: u.role === 'STUDENT' ? !!u.verified_at : true,
+  isVerified: !!u.verified_at,
 });
 
 export function createAuthRouter(limiters) {
@@ -58,18 +66,20 @@ export function createAuthRouter(limiters) {
     const d = registerSchema.parse(req.body);
     const hash = await argon2.hash(d.password, HASH_OPTS);
     const isProfessor = d.role === 'PROFESSOR';
+    const isProdOrDev = env.NODE_ENV !== 'test';
+    const autoActivate = isProfessor || isProdOrDev;
     let verifyToken = null;
     let newUser = null;
     try {
       await withTx(async (db) => {
-        // Professors are ACTIVE immediately (no email verification needed).
-        // Students must verify their email first.
-        const status = isProfessor ? 'ACTIVE' : 'PENDING_EMAIL';
+        // Professors and non-test users are ACTIVE immediately.
+        // In test mode, students must verify their email first.
+        const status = autoActivate ? 'ACTIVE' : 'PENDING_EMAIL';
         const { rows } = await db.query(
           `INSERT INTO users(email,password_hash,role_id,first_name,last_name,locale,status,email_verified_at)
            VALUES ($1,$2,(SELECT id FROM roles WHERE code=$3),$4,$5,$6,$7,$8) RETURNING id, email, first_name, last_name, locale`,
           [d.email, hash, d.role, d.firstName, d.lastName, d.locale,
-           status, isProfessor ? new Date() : null]);
+           status, autoActivate ? new Date() : null]);
         const row = rows[0];
         if (d.role === 'STUDENT') {
           await db.query('INSERT INTO students(user_id,matricule) VALUES ($1,$2)',
@@ -78,7 +88,11 @@ export function createAuthRouter(limiters) {
             await db.query('INSERT INTO class_students(class_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
               [d.classId, row.id]);
           }
-          verifyToken = await issueToken(row.id, 'VERIFY_EMAIL', 24 * 60, db);
+          if (status === 'PENDING_EMAIL') {
+            verifyToken = await issueToken(row.id, 'VERIFY_EMAIL', 24 * 60, db);
+          } else {
+            newUser = { ...row, role: d.role };
+          }
         } else {
           await db.query('INSERT INTO professors(user_id,department_id,title) VALUES ($1,$2,$3)',
             [row.id, d.departmentId ?? null, d.title ?? null]);
@@ -96,24 +110,25 @@ export function createAuthRouter(limiters) {
         text: `Welcome! Verify your account (valid 24h):\n${env.CLIENT_ORIGIN}/verify-email?token=${verifyToken}\n`,
       });
     }
-    // Auto-login for professors: create session and set cookie
-    if (isProfessor) {
-      if (newUser) {
-        const token = await createSession(newUser.id, req);
-        await query('UPDATE users SET last_login_at = now() WHERE id=$1', [newUser.id]);
-        await audit({ actorId: newUser.id, action: 'LOGIN', entityType: 'user', entityId: newUser.id, ip: req.ip });
-        res.cookie(SESSION_COOKIE, token, {
-          httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax',
-          maxAge: ABSOLUTE_HOURS * 3600_000, path: '/',
-        });
-        return res.status(201).json({ success: true, data: { user: publicUser(newUser), csrfToken: csrfTokenFor(sha256(token)) } });
-      }
-      // If email already existed: check if this is the professor logging in with their password
+    // Auto-login for active users: create session and set cookie
+    if (newUser) {
+      const token = await createSession(newUser.id, req);
+      await query('UPDATE users SET last_login_at = now() WHERE id=$1', [newUser.id]);
+      await audit({ actorId: newUser.id, action: 'LOGIN', entityType: 'user', entityId: newUser.id, ip: req.ip });
+      const isProd = env.NODE_ENV === 'production';
+      res.cookie(SESSION_COOKIE, token, {
+        httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax',
+        maxAge: ABSOLUTE_HOURS * 3600_000, path: '/',
+      });
+      return res.status(201).json({ success: true, data: { user: publicUser(newUser), csrfToken: csrfTokenFor(sha256(token)), token } });
+    }
+    // If email already existed and account is active
+    if (isProfessor || isProdOrDev) {
       const { rows: existingRows } = await query(
         `SELECT u.*, r.code AS role FROM users u JOIN roles r ON r.id=u.role_id WHERE lower(u.email)=$1`, [d.email]
       );
       const existingUser = existingRows[0];
-      if (existingUser && existingUser.role === 'PROFESSOR') {
+      if (existingUser) {
         const passwordOk = await argon2.verify(existingUser.password_hash, d.password).catch(() => false);
         if (passwordOk && (existingUser.status === 'ACTIVE' || existingUser.status === 'PENDING_EMAIL')) {
           if (existingUser.status === 'PENDING_EMAIL') {
@@ -156,7 +171,12 @@ export function createAuthRouter(limiters) {
   r.post('/login', limiters.loginByIp, limiters.loginByAccount, async (req, res) => {
     const { email: addr, password: pw } = loginSchema.parse(req.body);
     const { rows } = await query(
-      `SELECT u.*, r.code AS role FROM users u JOIN roles r ON r.id=u.role_id WHERE lower(u.email)=$1`, [addr]);
+      `SELECT u.*, r.code AS role, COALESCE(p.verified_at, st.verified_at) AS verified_at
+         FROM users u
+         JOIN roles r ON r.id=u.role_id
+         LEFT JOIN professors p ON p.user_id=u.id
+         LEFT JOIN students st ON st.user_id=u.id
+        WHERE lower(u.email)=$1`, [addr]);
     let u = rows[0];
     const passwordOk = await argon2.verify(u?.password_hash ?? DUMMY_HASH, pw).catch(() => false);
     if (!u || !passwordOk) {
@@ -169,8 +189,8 @@ export function createAuthRouter(limiters) {
                    suspension_reason=NULL, updated_at=now() WHERE id=$1`, [u.id]);
       u = { ...u, status: 'ACTIVE' };
     }
-    // Professors never require email verification — auto-activate if needed
-    if (u.role === 'PROFESSOR' && u.status === 'PENDING_EMAIL') {
+    // Professors and non-test students never require email verification — auto-activate if needed
+    if ((u.role === 'PROFESSOR' || env.NODE_ENV !== 'test') && u.status === 'PENDING_EMAIL') {
       await query(`UPDATE users SET status='ACTIVE', email_verified_at=COALESCE(email_verified_at, now()), updated_at=now() WHERE id=$1`, [u.id]);
       u = { ...u, status: 'ACTIVE' };
     }
