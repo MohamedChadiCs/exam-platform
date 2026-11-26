@@ -181,9 +181,10 @@ examsRouter.get('/:id', async (req, res) => {
   const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
 
   const { rows: examRows } = await query(
-    `SELECT e.*, c.name AS course_name, c.code AS course_code
+    `SELECT e.*, c.name AS course_name, c.code AS course_code, d.name AS department_name
        FROM exams e
        JOIN courses c ON c.id = e.course_id
+       LEFT JOIN departments d ON d.id = c.department_id
       WHERE e.id = $1 AND (e.owner_id = $2 OR $3 = 'ADMIN')`,
     [id, req.auth.user.id, req.auth.user.role]
   );
