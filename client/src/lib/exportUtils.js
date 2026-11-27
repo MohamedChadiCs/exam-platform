@@ -234,6 +234,10 @@ export function exportGradesToPdf(exam, submissions, { filename, variant = 'deta
 
 // ==========================================
 // Professional Academic Exam Paper PDF Export
+// 3-Part Architecture:
+// Part 1: Official Academic Cover Page
+// Part 2: Question Paper (Sujet d'examen)
+// Part 3: Candidate Answer Booklet (Feuilles de réponses)
 // ==========================================
 
 const PDF_TRANSLATIONS = {
@@ -241,30 +245,56 @@ const PDF_TRANSLATIONS = {
     institution: "ÉTABLISSEMENT D'ENSEIGNEMENT SUPÉRIEUR",
     departmentDefault: "DÉPARTEMENT DES ÉTUDES ACADÉMIQUES",
     coursePrefix: "COURS / MODULE",
+    academicYear: "Année Universitaire 2026 / 2027",
     duration: "Durée",
     minutes: "min",
-    totalScore: "Barème",
-    passingScore: "Moyenne",
+    totalScore: "Barème total",
+    passingScore: "Note de passage",
+    questionCount: "Nb. de questions",
     points: "pts",
     point: "pt",
     studentInfoTitle: "CADRE RÉSERVÉ AU CANDIDAT",
     studentName: "Nom et Prénom :",
     matricule: "N° Matricule :",
+    filiere: "Filière / Classe :",
     groupOrRoom: "Groupe / Salle :",
-    finalGrade: "NOTE :",
-    instructionsTitle: "CONSIGNES AUX CANDIDATS",
+    placeNo: "Place N° :",
+    signatureLabel: "Signature du candidat :",
+    gradingGridTitle: "GRILLE D'ÉVALUATION ET DE NOTATION (RÉSERVÉE AUX EXAMINATEURS)",
+    colExercise: "Exercice",
+    colBareme: "Barème",
+    colGrade: "Note attribuée",
+    colNotes: "Observations",
+    totalLabel: "TOTAL GÉNÉRAL",
+    markerSignature: "Visa du correcteur :",
+    instructionsTitle: "CONSIGNES IMPORTANTES AUX CANDIDATS",
+    defaultInstructions: [
+      "1. Vérifiez que votre sujet comporte l'ensemble des pages avant de commencer.",
+      "2. Aucun document, téléphone portable ou appareil électronique n'est autorisé.",
+      "3. Écrivez lisiblement à l'encre bleue ou noire. L'usage du correcteur blanc est déconseillé.",
+      "4. Répondez exclusivement dans les espaces réservés sur la FEUILLE DE RÉPONSES.",
+      "5. La clarté, la rigueur et la précision de la rédaction sont prises en compte.",
+    ],
+    startExamNotice: "Tournez la page pour découvrir les sujets d'examen ➔",
+    questionPaperTitle: "SUJET D'EXAMEN — ÉNONCÉS DES QUESTIONS",
+    questionPaperSubtitle: "Lisez attentivement l'intégralité du sujet. Reportez toutes vos réponses sur le cahier de réponses.",
+    seeAnswerSheetNotice: "➔ Rédigez votre réponse sur la FEUILLE DE RÉPONSES à la fin du document.",
+    answerBookletTitle: "FEUILLE DE RÉPONSES / CAHIER DE RÉDACTION",
+    answerBookletSubtitle: "Rédigez soigneusement vos réponses dans les cadres prévus pour chaque exercice.",
+    candidateReminder: "Rappel Candidat — Nom : ________________________   Matricule : ______________   Salle : ______",
     exercise: "Exercice",
     question: "Question",
-    answerLabel: "Réponse :",
-    workSpaceLabel: "Espace de réponse / rédaction :",
-    codeLabel: "Solution en code :",
+    answerLabel: "Réponse finale :",
+    workSpaceLabel: "Espace de rédaction / Calculs :",
+    codeLabel: "Solution en code source :",
+    codeInstructions: "Rédigez votre code lisiblement en respectant l'indentation :",
     matchingPrompt: "Associez chaque élément de gauche à sa correspondance :",
     orderingPrompt: "Indiquez l'ordre chronologique ou logique (1, 2, 3...) :",
     blankPrompt: "Complétez les éléments manquants :",
     maxWords: "Max",
     words: "mots",
-    attachmentAudio: "Fichier Audio",
-    attachmentVideo: "Fichier Vidéo",
+    attachmentAudio: "Document Audio",
+    attachmentVideo: "Document Vidéo",
     attachmentMedia: "Pièce jointe",
     page: "Page",
     of: "sur",
@@ -287,30 +317,56 @@ const PDF_TRANSLATIONS = {
     institution: "INSTITUTION OF HIGHER EDUCATION",
     departmentDefault: "DEPARTMENT OF ACADEMIC STUDIES",
     coursePrefix: "COURSE / MODULE",
+    academicYear: "Academic Year 2026 / 2027",
     duration: "Duration",
     minutes: "min",
     totalScore: "Total Score",
     passingScore: "Pass Score",
+    questionCount: "No. of Questions",
     points: "pts",
     point: "pt",
     studentInfoTitle: "CANDIDATE IDENTIFICATION BOX",
     studentName: "Full Name:",
     matricule: "Student ID:",
+    filiere: "Degree / Class:",
     groupOrRoom: "Group / Room:",
-    finalGrade: "GRADE:",
-    instructionsTitle: "INSTRUCTIONS TO CANDIDATES",
+    placeNo: "Seat No.:",
+    signatureLabel: "Candidate's Signature:",
+    gradingGridTitle: "EVALUATION & GRADING GRID (FOR EXAMINERS ONLY)",
+    colExercise: "Exercise",
+    colBareme: "Max",
+    colGrade: "Awarded",
+    colNotes: "Notes",
+    totalLabel: "OVERALL TOTAL",
+    markerSignature: "Examiner's Signature:",
+    instructionsTitle: "IMPORTANT INSTRUCTIONS TO CANDIDATES",
+    defaultInstructions: [
+      "1. Ensure you have received a complete examination paper before you start.",
+      "2. No unauthorised documents, mobile phones, or smart devices are allowed.",
+      "3. Write legibly in blue or black ink. Pencil is only permitted for drawings/graphs.",
+      "4. Record all your answers strictly in the designated spaces in the ANSWER BOOKLET.",
+      "5. Clarity, structure, and precision of presentation will be awarded credit.",
+    ],
+    startExamNotice: "Turn the page to read the examination questions ➔",
+    questionPaperTitle: "QUESTION PAPER — EXAM QUESTIONS",
+    questionPaperSubtitle: "Read each question carefully. Write all answers on the provided Answer Sheet.",
+    seeAnswerSheetNotice: "➔ Record your solution on the ANSWER SHEET at the end of the paper.",
+    answerBookletTitle: "CANDIDATE ANSWER BOOKLET / ANSWER SHEET",
+    answerBookletSubtitle: "Write your answers clearly in the designated spaces provided for each exercise.",
+    candidateReminder: "Candidate Reminder — Name: ________________________   ID: ______________   Room: ______",
     exercise: "Exercise",
     question: "Question",
-    answerLabel: "Answer:",
-    workSpaceLabel: "Written Answer Space / Calculations:",
+    answerLabel: "Final Answer:",
+    workSpaceLabel: "Written Response / Working Space:",
     codeLabel: "Source Code Solution:",
-    matchingPrompt: "Match each item on the left with its corresponding pair:",
+    codeInstructions: "Write your code cleanly maintaining correct indentation:",
+    matchingPrompt: "Match each item on the left with its partner on the right:",
     orderingPrompt: "Order the items sequentially (1, 2, 3...):",
     blankPrompt: "Fill in the blank fields:",
     maxWords: "Max",
     words: "words",
-    attachmentAudio: "Audio File",
-    attachmentVideo: "Video File",
+    attachmentAudio: "Audio Document",
+    attachmentVideo: "Video Document",
     attachmentMedia: "Attachment",
     page: "Page",
     of: "of",
@@ -333,23 +389,48 @@ const PDF_TRANSLATIONS = {
     institution: "المؤسسة الجامعية للتعليم العالي",
     departmentDefault: "قسم الدراسات الأكاديمية",
     coursePrefix: "المقياس / المادة",
+    academicYear: "السنة الجامعية 2026 / 2027",
     duration: "المدة",
     minutes: "د",
     totalScore: "المجموع",
     passingScore: "علامة النجاح",
+    questionCount: "عدد الأسئلة",
     points: "نقاط",
     point: "نقطة",
     studentInfoTitle: "معلومات المترشح",
     studentName: "اللقب والاسم :",
     matricule: "رقم التسجيل :",
+    filiere: "الشعبة / القسم :",
     groupOrRoom: "الفوج / القاعة :",
-    finalGrade: "العلامة :",
-    instructionsTitle: "تعليمات للمترشحين",
+    placeNo: "رقم المقعد :",
+    signatureLabel: "توقيع الطالب :",
+    gradingGridTitle: "جدول التنقيط والتقييم (خاص بالأستاذ المصحح)",
+    colExercise: "التمرين",
+    colBareme: "النقطة",
+    colGrade: "العلامة",
+    colNotes: "ملاحظات",
+    totalLabel: "المجموع الكلي",
+    markerSignature: "تأشيرة المصحح :",
+    instructionsTitle: "تعليمات هامة للمترشحين",
+    defaultInstructions: [
+      "1. تأكد من وضوح واكتمال صفحات ورقة الامتحان قبل الشروع في الإجابة.",
+      "2. يمنع منعا باتا استخدام الهاتف النقال أو أي وثائق غير مرخص بها.",
+      "3. اكتب بخط واضح ومقروء بالحبر الأزرق أو الأسود.",
+      "4. اكتب الإجابات حصرا في المساحات المخصصة على ورقة الإجابة المرفقة.",
+    ],
+    startExamNotice: "اقلب الصفحة لبدء موضوع الامتحان ➔",
+    questionPaperTitle: "موضوع الامتحان — نص الأسئلة",
+    questionPaperSubtitle: "اقرأ التمارين بتمعن. دون جميع إجاباتك على ورقة الإجابة المخصصة.",
+    seeAnswerSheetNotice: "➔ دون إجابتك على ورقة الإجابة المخصصة في نهاية الملف.",
+    answerBookletTitle: "ورقة الإجابة والتحرير",
+    answerBookletSubtitle: "اكتب إجاباتك في الإطار المخصص لكل تمرين بعناية.",
+    candidateReminder: "تذكير المترشح — الاسم: ________________________   التسجيل: ______________   القاعة: ______",
     exercise: "تمرين",
     question: "سؤال",
-    answerLabel: "الإجابة :",
-    workSpaceLabel: "مساحة التحرير والإجابة :",
+    answerLabel: "الإجابة النهائية :",
+    workSpaceLabel: "مساحة التحرير والحساب :",
     codeLabel: "كتابة الشيفرة البرمجية :",
+    codeInstructions: "اكتب الكود البرمجي بوضوح ودقة :",
     matchingPrompt: "اربط كل عنصر بما يناسبه :",
     orderingPrompt: "رتب العناصر بالتسلسل (1، 2، 3...) :",
     blankPrompt: "املأ الفراغات بالكلمات المناسبة :",
@@ -377,7 +458,7 @@ const PDF_TRANSLATIONS = {
   },
 };
 
-function drawRuledWritingLines(doc, x1, x2, startY, count, spacing = 20) {
+function drawRuledDottedLines(doc, x1, x2, startY, count, spacing = 20) {
   doc.setDrawColor(203, 213, 225); // slate-300
   doc.setLineWidth(0.65);
   doc.setLineDashPattern([2, 2.5], 0);
@@ -394,9 +475,9 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 40;
+  const margin = 38;
   const contentWidth = pageWidth - margin * 2;
-  const bottomThreshold = pageHeight - 48;
+  const bottomThreshold = pageHeight - 44;
   let y = margin;
 
   // Language & Translation
@@ -404,7 +485,7 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   const locale = PDF_TRANSLATIONS[rawLocale] ? rawLocale : 'fr';
   const tr = PDF_TRANSLATIONS[locale];
 
-  const title = (examData.title || tr.exam).trim();
+  const title = (examData.title || 'EXAMEN').trim();
   const courseCode = (examData.course_code || selectedCourse?.code || '').trim();
   const courseName = (examData.course_name || selectedCourse?.name || '').trim();
   const departmentName = (examData.department_name || selectedCourse?.department_name || tr.departmentDefault).trim();
@@ -414,139 +495,212 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   const rawQuestions = examData.questions || [];
   const totalPoints = rawQuestions.reduce((s, q) => s + (Number(q.points) || 0), 0) || examData.max_score || examData.maxScore || 20;
 
-  function ensureSpace(needed) {
+  let currentSectionTitle = '';
+
+  function ensureSpace(needed, sectionName = currentSectionTitle) {
     if (y + needed > bottomThreshold) {
       doc.addPage();
-      y = margin;
-      drawRunningHeader();
+      y = margin + 14;
+      drawRunningHeader(sectionName);
     }
   }
 
-  function drawRunningHeader() {
+  function drawRunningHeader(sectionName) {
     if (doc.internal.getNumberOfPages() > 1) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184); // slate-400
       const leftHeader = courseCode ? `${courseCode} — ${title}` : title;
-      doc.text(leftHeader, margin, y - 14);
+      doc.text(leftHeader, margin, margin - 4);
+      if (sectionName) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(sectionName.toUpperCase(), pageWidth - margin, margin - 4, { align: 'right' });
+      }
       doc.setDrawColor(226, 232, 240); // slate-200
-      doc.setLineWidth(0.5);
-      doc.line(margin, y - 8, pageWidth - margin, y - 8);
+      doc.setLineWidth(0.65);
+      doc.line(margin, margin + 2, pageWidth - margin, margin + 2);
     }
   }
 
   // ==========================================
-  // PAGE 1: PRESTIGIOUS INSTITUTIONAL HEADER
+  // PART 1: OFFICIAL ACADEMIC COVER PAGE (PAGE 1)
   // ==========================================
+  currentSectionTitle = 'PAGE DE GARDE';
 
-  // Department / Institution
+  // Decorative border around Cover Page
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(1);
+  doc.roundedRect(margin - 8, margin - 8, contentWidth + 16, pageHeight - (margin * 2) + 16, 6, 6, 'S');
+
+  // Institution Banner
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(71, 85, 105); // slate-600
-  doc.text(departmentName.toUpperCase(), pageWidth / 2, y, { align: 'center' });
-  y += 14;
+  doc.setFontSize(9.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text(tr.institution, pageWidth / 2, y + 8, { align: 'center' });
+  y += 20;
 
-  // Course Line
-  if (courseCode || courseName) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(51, 65, 85);
-    const courseText = `${tr.coursePrefix} : ${courseCode ? `${courseCode} — ` : ''}${courseName}`.toUpperCase();
-    doc.text(courseText, pageWidth / 2, y, { align: 'center' });
-    y += 18;
-  }
-
-  // Exam Title
-  doc.setFont('times', 'bold');
-  doc.setFontSize(17);
-  doc.setTextColor(15, 23, 42); // slate-900
-  const titleLines = doc.splitTextToSize(title.toUpperCase(), contentWidth);
-  doc.text(titleLines, pageWidth / 2, y, { align: 'center' });
-  y += titleLines.length * 19 + 6;
-
-  // Metadata Strip (Duration, Total Points, Passing Score)
-  doc.setDrawColor(203, 213, 225); // slate-300
-  doc.setLineWidth(0.75);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 13;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(71, 85, 105);
+  doc.text(departmentName.toUpperCase(), pageWidth / 2, y + 6, { align: 'center' });
+  y += 18;
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(51, 65, 85);
-  const metadataText = `${tr.duration} : ${durationMinutes} ${tr.minutes}     •     ${tr.totalScore} : ${totalPoints} ${tr.points}     •     ${tr.passingScore} : ${passingScore} ${tr.points}`;
-  doc.text(metadataText, pageWidth / 2, y, { align: 'center' });
-  y += 10;
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 14;
-
-  // Candidate Identification Box (Framed Academic Card)
-  const idBoxH = 46;
-  doc.setDrawColor(203, 213, 225);
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.roundedRect(margin, y, contentWidth, idBoxH, 4, 4, 'FD');
-
-  // Left side: Student Name, Matricule, Room
-  doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text(tr.studentName, margin + 12, y + 17);
-  doc.setDrawColor(148, 163, 184);
-  doc.setLineWidth(0.5);
-  doc.line(margin + 80, y + 18, margin + 330, y + 18);
+  doc.setTextColor(100, 116, 139);
+  doc.text(tr.academicYear, pageWidth / 2, y + 4, { align: 'center' });
+  y += 16;
 
-  doc.text(tr.matricule, margin + 12, y + 35);
-  doc.line(margin + 75, y + 36, margin + 200, y + 36);
+  // Course Box
+  doc.setDrawColor(226, 232, 240);
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin + 20, y, contentWidth - 40, 26, 3, 3, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(30, 41, 59);
+  const courseStr = `${tr.coursePrefix} : ${courseCode ? `${courseCode} — ` : ''}${courseName}`.toUpperCase();
+  doc.text(courseStr, pageWidth / 2, y + 17, { align: 'center' });
+  y += 38;
 
-  doc.text(tr.groupOrRoom, margin + 215, y + 35);
-  doc.line(margin + 285, y + 36, margin + 350, y + 36);
+  // Examination Title
+  doc.setFont('times', 'bold');
+  doc.setFontSize(21);
+  doc.setTextColor(15, 23, 42);
+  const titleLines = doc.splitTextToSize(title.toUpperCase(), contentWidth - 30);
+  doc.text(titleLines, pageWidth / 2, y + 10, { align: 'center' });
+  y += titleLines.length * 22 + 10;
 
-  // Right side: Official Grade Award Box
-  const gradeBoxW = 120;
-  const gradeBoxX = pageWidth - margin - gradeBoxW - 8;
-  doc.setDrawColor(148, 163, 184);
+  // Key Parameters Strip
+  const stripW = contentWidth - 20;
+  const stripX = margin + 10;
+  doc.setDrawColor(203, 213, 225);
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(gradeBoxX, y + 6, gradeBoxW, 34, 3, 3, 'FD');
+  doc.roundedRect(stripX, y, stripW, 30, 3, 3, 'FD');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(51, 65, 85);
+  const metaText = `${tr.duration} : ${durationMinutes} ${tr.minutes}    |    ${tr.totalScore} : ${totalPoints} ${tr.points}    |    ${tr.passingScore} : ${passingScore} ${tr.points}    |    ${tr.questionCount} : ${rawQuestions.length}`;
+  doc.text(metaText, pageWidth / 2, y + 19, { align: 'center' });
+  y += 42;
+
+  // Candidate Identification Box
+  const idBoxH = 76;
+  doc.setDrawColor(148, 163, 184);
+  doc.setFillColor(250, 252, 255);
+  doc.roundedRect(margin + 10, y, stripW, idBoxH, 4, 4, 'FD');
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(100, 116, 139);
-  doc.text(tr.finalGrade, gradeBoxX + 8, y + 18);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`____ / ${totalPoints}`, gradeBoxX + gradeBoxW - 10, y + 27, { align: 'right' });
+  doc.setTextColor(79, 70, 229);
+  doc.text(tr.studentInfoTitle, margin + 20, y + 14);
 
-  y += idBoxH + 14;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(51, 65, 85);
 
-  // Instructions Box (if instructions exist)
-  if (descriptionMd) {
-    const instrLines = doc.splitTextToSize(descriptionMd, contentWidth - 26);
-    const instrBoxH = instrLines.length * 12 + 24;
-    ensureSpace(instrBoxH + 10);
+  // Line 1: Nom & Prenom
+  doc.text(tr.studentName, margin + 20, y + 32);
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.5);
+  doc.line(margin + 85, y + 33, margin + 440, y + 33);
 
-    doc.setDrawColor(226, 232, 240);
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(margin, y, contentWidth, instrBoxH, 3, 3, 'FD');
+  // Line 2: Matricule, Filiere
+  doc.text(tr.matricule, margin + 20, y + 50);
+  doc.line(margin + 78, y + 51, margin + 210, y + 51);
+  doc.text(tr.filiere, margin + 225, y + 50);
+  doc.line(margin + 295, y + 51, margin + 440, y + 51);
 
-    // Left accent stripe
-    doc.setFillColor(79, 70, 229); // mark color
-    doc.rect(margin, y, 3.5, instrBoxH, 'F');
+  // Line 3: Salle, Signature
+  doc.text(tr.groupOrRoom, margin + 20, y + 68);
+  doc.line(margin + 85, y + 69, margin + 210, y + 69);
+  doc.text(tr.signatureLabel, margin + 225, y + 68);
+  doc.line(margin + 310, y + 69, margin + 440, y + 69);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(79, 70, 229);
-    doc.text(tr.instructionsTitle, margin + 12, y + 13);
+  y += idBoxH + 16;
 
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text(instrLines, margin + 12, y + 25);
+  // Evaluation & Grading Table (For Examiners)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text(tr.gradingGridTitle, margin + 10, y);
+  y += 6;
 
-    y += instrBoxH + 16;
-  }
+  const gradingBody = rawQuestions.map((q, idx) => [
+    `${tr.exercise} ${idx + 1}${q.title ? ` : ${q.title}` : ''}`,
+    `${q.points || 1} ${tr.points}`,
+    '',
+    '',
+  ]);
+  gradingBody.push([
+    tr.totalLabel,
+    `${totalPoints} ${tr.points}`,
+    `     / ${totalPoints}`,
+    tr.markerSignature,
+  ]);
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin + 10, right: margin + 10 },
+    head: [[tr.colExercise, tr.colBareme, tr.colGrade, tr.colNotes]],
+    body: gradingBody,
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 3.5, textColor: [30, 41, 59] },
+    headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+    columnStyles: {
+      0: { cellWidth: 190 },
+      1: { cellWidth: 65, halign: 'center' },
+      2: { cellWidth: 95, halign: 'center' },
+      3: { halign: 'left' },
+    },
+  });
+
+  y = doc.lastAutoTable.finalY + 14;
+
+  // Instructions to Candidates Box
+  const rawInstructions = descriptionMd ? [descriptionMd] : tr.defaultInstructions;
+  const instrText = rawInstructions.join('\n');
+  const instrLines = doc.splitTextToSize(instrText, stripW - 24);
+  const instrH = Math.min(instrLines.length * 11 + 22, 100);
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(stripX, y, stripW, instrH, 3, 3, 'FD');
+  doc.setFillColor(79, 70, 229);
+  doc.rect(stripX, y, 3, instrH, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(79, 70, 229);
+  doc.text(tr.instructionsTitle, stripX + 12, y + 12);
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(instrLines, stripX + 12, y + 23);
+
+  // Bottom Notice on Page 1
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(79, 70, 229);
+  doc.text(tr.startExamNotice, pageWidth / 2, pageHeight - margin - 2, { align: 'center' });
 
   // ==========================================
-  // EXERCISES / QUESTIONS RENDERING
+  // PART 2: QUESTION PAPER (SUJET D'EXAMEN)
   // ==========================================
+  currentSectionTitle = tr.questionPaperTitle;
+  doc.addPage();
+  y = margin + 14;
+  drawRunningHeader(tr.questionPaperTitle);
+
+  // Section Banner: Sujet d'Examen
+  doc.setDrawColor(203, 213, 225);
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, y, contentWidth, 26, 3, 3, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(30, 41, 59);
+  doc.text(tr.questionPaperTitle, pageWidth / 2, y + 17, { align: 'center' });
+  y += 34;
 
   rawQuestions.forEach((q, idx) => {
     const typeCode = q.typeCode || q.type_code || 'MCQ_SINGLE';
@@ -560,14 +714,14 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
     const typeLabel = tr.types[typeCode] || typeCode;
     const ptsText = `[ ${points} ${points === 1 ? tr.point : tr.points} ]`;
 
-    // Estimate initial needed height for header + prompt to prevent orphan exercise headers
-    const bodyLines = doc.splitTextToSize(bodyMd, contentWidth);
-    const headerPromptHeight = 44 + bodyLines.length * 13;
-    ensureSpace(Math.min(headerPromptHeight + 35, 130));
+    // Ensure we don't start question right at bottom of page
+    const bodyLines = doc.splitTextToSize(bodyMd, contentWidth - 10);
+    const estimatedH = 40 + bodyLines.length * 13;
+    ensureSpace(Math.min(estimatedH, 120), tr.questionPaperTitle);
 
-    // Separator between exercises (except top of page)
+    // Exercise separator
     if (idx > 0 && y > margin + 20) {
-      doc.setDrawColor(241, 245, 249); // slate-100
+      doc.setDrawColor(241, 245, 249);
       doc.setLineWidth(0.5);
       doc.line(margin, y - 6, pageWidth - margin, y - 6);
     }
@@ -576,28 +730,17 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
     doc.setFont('times', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(15, 23, 42);
+    const exHeader = `${tr.exercise} ${idx + 1}${qTitle ? ` : ${qTitle}` : ''}`;
+    doc.text(exHeader, margin, y);
 
-    const exercisePrefix = `${tr.exercise} ${idx + 1}`;
-    doc.text(exercisePrefix, margin, y);
-    const prefixW = doc.getTextWidth(exercisePrefix);
-
-    if (qTitle) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(30, 41, 59);
-      doc.text(` : ${qTitle}`, margin + prefixW, y);
+    const titleW = doc.getTextWidth(exHeader);
+    if (titleW < contentWidth - 130) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`— ${typeLabel}`, margin + titleW + 8, y);
     }
 
-    // Question Type Label
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    const titleFullW = prefixW + (qTitle ? doc.getTextWidth(` : ${qTitle}`) : 0);
-    if (titleFullW < contentWidth - 110) {
-      doc.text(`— ${typeLabel}`, margin + titleFullW + 8, y);
-    }
-
-    // Points box on right
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(51, 65, 85);
@@ -610,13 +753,10 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
       doc.setFontSize(8);
       doc.setTextColor(79, 70, 229);
       attachments.forEach((att) => {
-        let iconText = `📎 ${tr.attachmentMedia}`;
-        if (att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/')) {
-          iconText = `🔊 ${tr.attachmentAudio}`;
-        } else if (att.mime_type?.startsWith('video/') || att.mimeType?.startsWith('video/')) {
-          iconText = `🎬 ${tr.attachmentVideo}`;
-        }
-        doc.text(`[ ${iconText} : ${att.filename} ]`, margin, y);
+        let icon = `📎 ${tr.attachmentMedia}`;
+        if (att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/')) icon = `🔊 ${tr.attachmentAudio}`;
+        else if (att.mime_type?.startsWith('video/') || att.mimeType?.startsWith('video/')) icon = `🎬 ${tr.attachmentVideo}`;
+        doc.text(`[ ${icon} : ${att.filename} ]`, margin, y);
         y += 11;
       });
       y += 2;
@@ -629,243 +769,315 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
     doc.text(bodyLines, margin, y);
     y += bodyLines.length * 13 + 6;
 
-    // ==========================================
-    // Clean, Realistic Answer Spaces per Type
-    // ==========================================
-
+    // Options for MCQ / True-False
     if (typeCode === 'MCQ_SINGLE' || typeCode === 'MCQ_MULTI' || typeCode === 'TRUE_FALSE') {
-      // Academic Multiple Choice Options
-      const isMulti = typeCode === 'MCQ_MULTI';
       options.forEach((opt, oIdx) => {
         const optText = (opt.bodyMd ?? opt.body_md ?? '').trim();
         const letter = String.fromCharCode(65 + oIdx);
-        const optLines = doc.splitTextToSize(optText, contentWidth - 44);
-        ensureSpace(optLines.length * 13 + 6);
+        const optLines = doc.splitTextToSize(optText, contentWidth - 36);
+        ensureSpace(optLines.length * 12 + 4, tr.questionPaperTitle);
 
-        // Checkbox / Circle
-        doc.setDrawColor(148, 163, 184);
-        doc.setLineWidth(0.65);
-        if (isMulti) {
-          doc.rect(margin + 6, y - 7.5, 8.5, 8.5);
-        } else {
-          doc.circle(margin + 10, y - 3, 4.5);
-        }
-
-        // Letter
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(51, 65, 85);
-        doc.text(`${letter}.`, margin + 21, y);
+        doc.text(`${letter}.`, margin + 10, y);
 
-        // Text
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(30, 41, 59);
-        doc.text(optLines, margin + 34, y);
-        y += optLines.length * 13 + 4;
+        doc.text(optLines, margin + 24, y);
+        y += optLines.length * 12 + 4;
       });
-      y += 6;
-
-    } else if (typeCode === 'SHORT_TEXT') {
-      // Short Answer Box (3 neat ruled lines)
-      ensureSpace(68);
-      doc.setDrawColor(226, 232, 240);
-      doc.setFillColor(250, 252, 255);
-      doc.roundedRect(margin, y, contentWidth, 60, 3, 3, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(tr.answerLabel, margin + 8, y + 12);
-
-      drawRuledWritingLines(doc, margin + 10, pageWidth - margin - 10, y + 6, 2, 19);
-      y += 68;
-
-    } else if (typeCode === 'ESSAY' || typeCode === 'LONG_TEXT') {
-      // Essay / Long Answer (8 neat ruled lines with word limit badge)
-      const maxW = config.maxWords || config.wordLimit;
-      const linesCount = typeCode === 'ESSAY' ? 8 : 6;
-      const boxHeight = linesCount * 19 + 20;
-      ensureSpace(boxHeight + 10);
-
-      doc.setDrawColor(226, 232, 240);
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(margin, y, contentWidth, boxHeight, 3, 3, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(tr.workSpaceLabel, margin + 8, y + 12);
-
-      if (maxW) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`(${tr.maxWords} : ${maxW} ${tr.words})`, pageWidth - margin - 10, y + 12, { align: 'right' });
-      }
-
-      drawRuledWritingLines(doc, margin + 10, pageWidth - margin - 10, y + 10, linesCount, 19);
-      y += boxHeight + 8;
-
-    } else if (typeCode === 'NUMERIC') {
-      // Numeric Calculation Card
-      ensureSpace(58);
-      doc.setDrawColor(226, 232, 240);
-      doc.setFillColor(250, 252, 255);
-      doc.roundedRect(margin, y, contentWidth, 50, 3, 3, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(51, 65, 85);
-      doc.text(tr.answerLabel, margin + 12, y + 18);
-
-      // Input box for answer
-      doc.setDrawColor(148, 163, 184);
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(margin + 75, y + 8, 170, 16, 2, 2, 'FD');
-
-      // Calculation line
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text(tr.workSpaceLabel, margin + 12, y + 36);
-      doc.setLineDashPattern([2, 2], 0);
-      doc.line(margin + 130, y + 36, pageWidth - margin - 12, y + 36);
-      doc.setLineDashPattern([], 0);
-
-      y += 58;
-
+      y += 4;
     } else if (typeCode === 'MATCHING' && Array.isArray(config.pairs)) {
-      // Matching Pairs Table
-      ensureSpace(config.pairs.length * 20 + 26);
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
       doc.text(tr.matchingPrompt, margin, y);
-      y += 12;
-
+      y += 11;
       config.pairs.forEach((p, pIdx) => {
-        ensureSpace(18);
-        const letter = String.fromCharCode(65 + pIdx);
-
-        // Left item
+        ensureSpace(16, tr.questionPaperTitle);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
+        doc.setFontSize(8.5);
         doc.setTextColor(30, 41, 59);
         doc.text(`${pIdx + 1}.  ${p.left || ''}`, margin + 8, y);
-
-        // Match box
-        doc.setDrawColor(148, 163, 184);
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(margin + 205, y - 8, 22, 11, 2, 2, 'FD');
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(148, 163, 184);
-        doc.text('...', margin + 213, y - 1);
-
-        // Right item
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(30, 41, 59);
-        doc.text(`${letter}.  ${p.right || ''}`, margin + 245, y);
-
-        y += 17;
+        doc.text(`${String.fromCharCode(65 + pIdx)}.  ${p.right || ''}`, margin + 220, y);
+        y += 14;
       });
-      y += 6;
-
+      y += 4;
     } else if (typeCode === 'ORDERING' && Array.isArray(config.items)) {
-      // Ordering Items
-      ensureSpace(config.items.length * 18 + 24);
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
       doc.text(tr.orderingPrompt, margin, y);
-      y += 12;
-
+      y += 11;
       config.items.forEach((item, iIdx) => {
-        ensureSpace(17);
-        doc.setDrawColor(148, 163, 184);
-        doc.rect(margin + 8, y - 7.5, 14, 10);
+        ensureSpace(15, tr.questionPaperTitle);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
+        doc.setFontSize(8.5);
         doc.setTextColor(30, 41, 59);
-        doc.text(`${iIdx + 1}.  ${item}`, margin + 28, y);
-        y += 16;
+        doc.text(`• ${item}`, margin + 12, y);
+        y += 14;
       });
-      y += 6;
+      y += 4;
+    } else if (typeCode === 'CODE' && config.starterCode) {
+      const codeLines = doc.splitTextToSize(config.starterCode, contentWidth - 30);
+      const codeBoxH = codeLines.length * 12 + 16;
+      ensureSpace(codeBoxH + 10, tr.questionPaperTitle);
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, y, contentWidth, codeBoxH, 3, 3, 'FD');
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 41, 59);
+      doc.text(codeLines, margin + 12, y + 13);
+      y += codeBoxH + 6;
+    }
 
-    } else if (typeCode === 'FILL_BLANK') {
-      // Fill in the Blanks
-      ensureSpace(38);
-      doc.setFont('helvetica', 'italic');
+    // Direct reminder note to answer in Answer Booklet
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(tr.seeAnswerSheetNotice, margin, y);
+    y += 14;
+  });
+
+  // ==========================================
+  // PART 3: CANDIDATE ANSWER BOOKLET (FEUILLE DE RÉPONSES)
+  // ==========================================
+  currentSectionTitle = tr.answerBookletTitle;
+  doc.addPage();
+  y = margin + 14;
+  drawRunningHeader(tr.answerBookletTitle);
+
+  // Section Banner: Feuille de Réponses
+  doc.setDrawColor(79, 70, 229);
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, y, contentWidth, 26, 3, 3, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(79, 70, 229);
+  doc.text(tr.answerBookletTitle, pageWidth / 2, y + 17, { align: 'center' });
+  y += 32;
+
+  // Candidate Quick-Reminder Bar
+  doc.setDrawColor(203, 213, 225);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(margin, y, contentWidth, 22, 2, 2, 'FD');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text(tr.candidateReminder, margin + 10, y + 15);
+  y += 30;
+
+  // Answer space for every question
+  rawQuestions.forEach((q, idx) => {
+    const typeCode = q.typeCode || q.type_code || 'MCQ_SINGLE';
+    const points = q.points ?? 1;
+    const config = q.config || {};
+    const options = q.options || [];
+    const qTitle = (q.title || '').trim();
+
+    // Determine lines count specified by teacher or defaults
+    const maxTeacherLines = config.answerLines ? parseInt(config.answerLines, 10) : null;
+    const isEssay = typeCode === 'ESSAY';
+    const isLongText = typeCode === 'LONG_TEXT';
+    const isShortText = typeCode === 'SHORT_TEXT';
+    const isCode = typeCode === 'CODE';
+
+    let neededH = 50;
+    if (typeCode === 'MCQ_SINGLE' || typeCode === 'MCQ_MULTI' || typeCode === 'TRUE_FALSE') {
+      neededH = 46;
+    } else if (isCode) {
+      const lines = maxTeacherLines || 18;
+      neededH = lines * 14 + 36;
+    } else if (isEssay || isLongText || isShortText) {
+      const lines = maxTeacherLines || (isEssay ? 14 : isLongText ? 10 : 5);
+      neededH = lines * 19 + 32;
+    } else if (typeCode === 'NUMERIC') {
+      neededH = 74;
+    } else if (typeCode === 'MATCHING' && Array.isArray(config.pairs)) {
+      neededH = config.pairs.length * 18 + 32;
+    } else if (typeCode === 'ORDERING' && Array.isArray(config.items)) {
+      neededH = config.items.length * 17 + 32;
+    }
+
+    ensureSpace(Math.min(neededH, 180), tr.answerBookletTitle);
+
+    // Answer block header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(15, 23, 42);
+    const exAnsTitle = `${tr.exercise} ${idx + 1}${qTitle ? ` : ${qTitle}` : ''}  [ ${points} ${tr.points} ]`;
+    doc.text(exAnsTitle, margin, y);
+    y += 12;
+
+    // Specific Answer Spaces:
+    if (typeCode === 'MCQ_SINGLE' || typeCode === 'MCQ_MULTI' || typeCode === 'TRUE_FALSE') {
+      // Clean Option Checkboxes grid
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text(tr.blankPrompt, margin, y);
-      y += 12;
+      doc.text("Cochez la réponse :", margin + 8, y + 4);
 
-      const blanksCount = Array.isArray(config.blanks) && config.blanks.length > 0 ? config.blanks.length : 1;
-      for (let b = 0; b < blanksCount; b++) {
-        ensureSpace(18);
+      let optX = margin + 110;
+      options.forEach((opt, oIdx) => {
+        const letter = String.fromCharCode(65 + oIdx);
+        doc.setDrawColor(148, 163, 184);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(optX, y - 6, 28, 14, 2, 2, 'FD');
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.5);
-        doc.setTextColor(71, 85, 105);
-        doc.text(`[ ${b + 1} ] : `, margin + 8, y);
-        doc.setDrawColor(148, 163, 184);
-        doc.setLineDashPattern([2, 2], 0);
-        doc.line(margin + 36, y, margin + 260, y);
-        doc.setLineDashPattern([], 0);
-        y += 16;
-      }
-      y += 6;
+        doc.setTextColor(30, 41, 59);
+        doc.text(`[  ] ${letter}`, optX + 4, y + 4);
+        optX += 40;
+      });
+      y += 18;
 
-    } else if (typeCode === 'CODE') {
-      // Programming Code Box with line numbers
-      const lang = config.language || 'Code';
-      const codeLines = config.starterCode ? doc.splitTextToSize(config.starterCode, contentWidth - 44) : [];
-      const blankLinesCount = 7;
-      const totalCodeLinesCount = Math.max(codeLines.length + 4, blankLinesCount);
-      const codeBoxH = totalCodeLinesCount * 14 + 24;
-      ensureSpace(Math.min(codeBoxH + 10, 160));
+    } else if (isCode) {
+      // Code Response Container (configured lines by teacher)
+      const linesCount = maxTeacherLines || 18;
+      const codeBoxH = linesCount * 14 + 18;
 
       doc.setDrawColor(203, 213, 225);
       doc.setFillColor(248, 250, 252);
       doc.roundedRect(margin, y, contentWidth, codeBoxH, 3, 3, 'FD');
 
-      // Top title bar
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(100, 116, 139);
-      doc.text(`${tr.codeLabel} (${lang})`, margin + 10, y + 11);
+      doc.text(`${tr.codeLabel} (${config.language || 'Code'}) — ${linesCount} lignes max`, margin + 8, y + 10);
 
-      // Monospace code area
-      let codeY = y + 23;
+      let codeLineY = y + 21;
       doc.setFont('courier', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8);
 
-      for (let l = 0; l < totalCodeLinesCount; l++) {
-        // Line number
+      for (let l = 0; l < linesCount; l++) {
         doc.setTextColor(148, 163, 184);
-        doc.text(`${String(l + 1).padStart(2, ' ')} |`, margin + 10, codeY);
+        doc.text(`${String(l + 1).padStart(2, ' ')} |`, margin + 10, codeLineY);
 
-        // Starter code if any
-        if (l < codeLines.length) {
-          doc.setTextColor(30, 41, 59);
-          doc.text(codeLines[l], margin + 34, codeY);
-        } else {
-          // Subtle dot guideline
-          doc.setDrawColor(226, 232, 240);
-          doc.setLineDashPattern([1, 3], 0);
-          doc.line(margin + 34, codeY, pageWidth - margin - 10, codeY);
-          doc.setLineDashPattern([], 0);
-        }
-        codeY += 14;
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineDashPattern([1, 3], 0);
+        doc.line(margin + 32, codeLineY, pageWidth - margin - 8, codeLineY);
+        doc.setLineDashPattern([], 0);
+        codeLineY += 14;
+      }
+      y += codeBoxH + 12;
+
+    } else if (isEssay || isLongText || isShortText) {
+      // Essay / Long / Short Text writing lines (configured lines by teacher)
+      const linesCount = maxTeacherLines || (isEssay ? 14 : isLongText ? 10 : 5);
+      const boxH = linesCount * 19 + 16;
+
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, contentWidth, boxH, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(tr.workSpaceLabel, margin + 8, y + 10);
+
+      const maxW = config.maxWords || config.wordLimit;
+      if (maxW) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`(${tr.maxWords} : ${maxW} ${tr.words})`, pageWidth - margin - 8, y + 10, { align: 'right' });
       }
 
-      y += codeBoxH + 8;
+      drawRuledDottedLines(doc, margin + 8, pageWidth - margin - 8, y + 8, linesCount, 19);
+      y += boxH + 12;
+
+    } else if (typeCode === 'NUMERIC') {
+      // Numeric Calculation & Final Answer Card
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(250, 252, 255);
+      doc.roundedRect(margin, y, contentWidth, 58, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(51, 65, 85);
+      doc.text(tr.answerLabel, margin + 10, y + 17);
+
+      doc.setDrawColor(148, 163, 184);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin + 90, y + 7, 180, 17, 2, 2, 'FD');
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text(tr.workSpaceLabel, margin + 10, y + 36);
+      drawRuledDottedLines(doc, margin + 10, pageWidth - margin - 10, y + 26, 1, 16);
+
+      y += 66;
+
+    } else if (typeCode === 'MATCHING' && Array.isArray(config.pairs)) {
+      // Matching Answer Boxes
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(tr.matchingPrompt, margin + 8, y);
+      y += 10;
+
+      config.pairs.forEach((p, pIdx) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(30, 41, 59);
+        doc.text(`${pIdx + 1}.  ${p.left || ''}`, margin + 12, y);
+
+        doc.setDrawColor(148, 163, 184);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(margin + 200, y - 8, 36, 12, 2, 2, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`[ ___ ]`, margin + 207, y);
+
+        y += 16;
+      });
+      y += 8;
+
+    } else if (typeCode === 'ORDERING' && Array.isArray(config.items)) {
+      // Ordering Sequence Boxes
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(tr.orderingPrompt, margin + 8, y);
+      y += 10;
+
+      let ordX = margin + 10;
+      config.items.forEach((_, iIdx) => {
+        doc.setDrawColor(148, 163, 184);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(ordX, y - 6, 48, 14, 2, 2, 'FD');
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(51, 65, 85);
+        doc.text(`${iIdx + 1}: [ ___ ]`, ordX + 4, y + 4);
+        ordX += 56;
+      });
+      y += 18;
+
+    } else if (typeCode === 'FILL_BLANK') {
+      const blanksCount = Array.isArray(config.blanks) && config.blanks.length > 0 ? config.blanks.length : 1;
+      for (let b = 0; b < blanksCount; b++) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Blank ${b + 1} : `, margin + 10, y);
+        doc.setDrawColor(148, 163, 184);
+        doc.setLineDashPattern([2, 2], 0);
+        doc.line(margin + 55, y, margin + 300, y);
+        doc.setLineDashPattern([], 0);
+        y += 16;
+      }
+      y += 6;
+
     } else {
-      // Fallback open space (3 neat ruled lines)
-      ensureSpace(58);
-      drawRuledWritingLines(doc, margin, pageWidth - margin, y + 2, 3, 18);
-      y += 60;
+      drawRuledDottedLines(doc, margin + 8, pageWidth - margin - 8, y + 2, 4, 18);
+      y += 74;
     }
 
     y += 10;
@@ -882,18 +1094,18 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
     // Footer hairline
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.5);
-    doc.line(margin, pageHeight - 28, pageWidth - margin, pageHeight - 28);
+    doc.line(margin, pageHeight - 26, pageWidth - margin, pageHeight - 26);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(148, 163, 184);
 
     // Left: Integrity note
-    doc.text(tr.confidential, margin, pageHeight - 16);
+    doc.text(tr.confidential, margin, pageHeight - 15);
 
     // Right: Page X of Y
     const pageStr = `${tr.page} ${i} ${tr.of} ${pageCount}`;
-    doc.text(pageStr, pageWidth - margin, pageHeight - 16, { align: 'right' });
+    doc.text(pageStr, pageWidth - margin, pageHeight - 15, { align: 'right' });
   }
 
   const defaultName = `${sanitizeFilename(title)}_paper`;

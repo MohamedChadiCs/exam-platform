@@ -961,32 +961,53 @@ export default function ExamPaperEditor() {
                   <div className="mt-2 space-y-1 rounded border border-slate-200 bg-slate-50/50 p-2">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[10.5px] text-slate-500">
                       <span className="italic">[Student response box]</span>
-                      <div className="flex items-center gap-1.5">
-                        <span>Word limits:</span>
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder="Min"
-                          value={q.config?.minWords ?? ''}
-                          onChange={(e) => updateQuestion(idx, { config: { ...q.config, minWords: parseInt(e.target.value, 10) || 0 } })}
-                          className="w-12 rounded border border-slate-200 bg-white px-1 py-0.5 text-[11px] text-center"
-                        />
-                        <span>–</span>
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder="Max"
-                          value={q.config?.maxWords ?? q.config?.wordLimit ?? ''}
-                          onChange={(e) => updateQuestion(idx, {
-                            config: {
-                              ...q.config,
-                              maxWords: parseInt(e.target.value, 10) || null,
-                              wordLimit: parseInt(e.target.value, 10) || null,
-                            },
-                          })}
-                          className="w-14 rounded border border-slate-200 bg-white px-1 py-0.5 text-[11px] text-center font-bold text-slate-700"
-                        />
-                        <span>words</span>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span>Word limits:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Min"
+                            value={q.config?.minWords ?? ''}
+                            onChange={(e) => updateQuestion(idx, { config: { ...q.config, minWords: parseInt(e.target.value, 10) || 0 } })}
+                            className="w-12 rounded border border-slate-200 bg-white px-1 py-0.5 text-[11px] text-center"
+                          />
+                          <span>–</span>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Max"
+                            value={q.config?.maxWords ?? q.config?.wordLimit ?? ''}
+                            onChange={(e) => updateQuestion(idx, {
+                              config: {
+                                ...q.config,
+                                maxWords: parseInt(e.target.value, 10) || null,
+                                wordLimit: parseInt(e.target.value, 10) || null,
+                              },
+                            })}
+                            className="w-14 rounded border border-slate-200 bg-white px-1 py-0.5 text-[11px] text-center font-bold text-slate-700"
+                          />
+                          <span>words</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 border-s border-slate-200 ps-2.5">
+                          <span className="font-medium text-slate-700">Answer lines (PDF):</span>
+                          <input
+                            type="number"
+                            min="2"
+                            max="60"
+                            placeholder={q.typeCode === 'ESSAY' ? '14' : '5'}
+                            value={q.config?.answerLines ?? ''}
+                            onChange={(e) => updateQuestion(idx, {
+                              config: {
+                                ...q.config,
+                                answerLines: parseInt(e.target.value, 10) || null,
+                              },
+                            })}
+                            className="w-14 rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px] text-center font-bold text-mark"
+                          />
+                          <span>lines</span>
+                        </div>
                       </div>
                     </div>
                     <div className="border-b border-dashed border-slate-300 py-0.5"></div>
@@ -1169,9 +1190,29 @@ export default function ExamPaperEditor() {
                 {/* Programming / Code configuration */}
                 {q.typeCode === 'CODE' && (
                   <div className="mt-2 space-y-1.5">
-                    <span className="text-slate-600 font-medium text-[11px] block">
-                      Programming Environment & Starter Code
-                    </span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-slate-600 font-medium text-[11px] block">
+                        Programming Environment & Starter Code
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
+                        <span className="font-medium text-slate-700">Answer lines (PDF):</span>
+                        <input
+                          type="number"
+                          min="5"
+                          max="60"
+                          placeholder="18"
+                          value={q.config?.answerLines ?? ''}
+                          onChange={(e) => updateQuestion(idx, {
+                            config: {
+                              ...q.config,
+                              answerLines: parseInt(e.target.value, 10) || null,
+                            },
+                          })}
+                          className="w-14 rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px] text-center font-bold text-mark"
+                        />
+                        <span>lines</span>
+                      </div>
+                    </div>
                     <CodeMorph
                       code={q.config?.starterCode ?? ''}
                       language={q.config?.language || 'c'}
