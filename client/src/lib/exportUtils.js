@@ -279,6 +279,8 @@ const PDF_TRANSLATIONS = {
     questionPaperTitle: "SUJET D'EXAMEN — ÉNONCÉS DES QUESTIONS",
     questionPaperSubtitle: "Lisez attentivement l'intégralité du sujet. Reportez toutes vos réponses sur le cahier de réponses.",
     seeAnswerSheetNotice: "➔ Rédigez votre réponse sur la FEUILLE DE RÉPONSES à la fin du document.",
+    checkAnswer: "Cochez la bonne réponse :",
+    blankLabel: "Trou",
     answerBookletTitle: "FEUILLE DE RÉPONSES / CAHIER DE RÉDACTION",
     answerBookletSubtitle: "Rédigez soigneusement vos réponses dans les cadres prévus pour chaque exercice.",
     candidateReminder: "Rappel Candidat — Nom : ________________________   Matricule : ______________   Salle : ______",
@@ -351,6 +353,8 @@ const PDF_TRANSLATIONS = {
     questionPaperTitle: "QUESTION PAPER — EXAM QUESTIONS",
     questionPaperSubtitle: "Read each question carefully. Write all answers on the provided Answer Sheet.",
     seeAnswerSheetNotice: "➔ Record your solution on the ANSWER SHEET at the end of the paper.",
+    checkAnswer: "Select the correct answer:",
+    blankLabel: "Blank",
     answerBookletTitle: "CANDIDATE ANSWER BOOKLET / ANSWER SHEET",
     answerBookletSubtitle: "Write your answers clearly in the designated spaces provided for each exercise.",
     candidateReminder: "Candidate Reminder — Name: ________________________   ID: ______________   Room: ______",
@@ -422,6 +426,8 @@ const PDF_TRANSLATIONS = {
     questionPaperTitle: "موضوع الامتحان — نص الأسئلة",
     questionPaperSubtitle: "اقرأ التمارين بتمعن. دون جميع إجاباتك على ورقة الإجابة المخصصة.",
     seeAnswerSheetNotice: "➔ دون إجابتك على ورقة الإجابة المخصصة في نهاية الملف.",
+    checkAnswer: "اختر الإجابة المناسبة :",
+    blankLabel: "الفراغ",
     answerBookletTitle: "ورقة الإجابة والتحرير",
     answerBookletSubtitle: "اكتب إجاباتك في الإطار المخصص لكل تمرين بعناية.",
     candidateReminder: "تذكير المترشح — الاسم: ________________________   التسجيل: ______________   القاعة: ______",
@@ -530,7 +536,7 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   // Decorative border around Cover Page
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(1);
-  doc.roundedRect(margin - 8, margin - 8, contentWidth + 16, pageHeight - (margin * 2) + 16, 6, 6, 'S');
+  doc.roundedRect(margin - 8, margin - 8, contentWidth + 16, pageHeight - (margin * 2) + 2, 6, 6, 'S');
 
   // Institution Banner
   doc.setFont('helvetica', 'bold');
@@ -660,7 +666,11 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   const rawInstructions = descriptionMd ? [descriptionMd] : tr.defaultInstructions;
   const instrText = rawInstructions.join('\n');
   const instrLines = doc.splitTextToSize(instrText, stripW - 24);
-  const instrH = Math.min(instrLines.length * 11 + 22, 100);
+
+  // Dynamically size instructions box so it never collides with startExamNotice
+  const maxInstrY = pageHeight - margin - 22;
+  const availInstrH = maxInstrY - y;
+  const instrH = Math.max(34, Math.min(instrLines.length * 11 + 20, Math.min(availInstrH, 80)));
 
   doc.setDrawColor(203, 213, 225);
   doc.setFillColor(255, 255, 255);
@@ -676,13 +686,14 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
-  doc.text(instrLines, stripX + 12, y + 23);
+  const maxVisibleLines = Math.floor((instrH - 18) / 11);
+  doc.text(instrLines.slice(0, maxVisibleLines), stripX + 12, y + 23);
 
   // Bottom Notice on Page 1
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(79, 70, 229);
-  doc.text(tr.startExamNotice, pageWidth / 2, pageHeight - margin - 2, { align: 'center' });
+  doc.text(tr.startExamNotice, pageWidth / 2, pageHeight - margin - 8, { align: 'center' });
 
   // ==========================================
   // PART 2: QUESTION PAPER (SUJET D'EXAMEN)
@@ -702,6 +713,20 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   doc.text(tr.questionPaperTitle, pageWidth / 2, y + 17, { align: 'center' });
   y += 34;
 
+  // Single Important Notice before all exercises (Mentioned once here)
+  const noticeH = 24;
+  doc.setDrawColor(199, 210, 254); // indigo-200
+  doc.setFillColor(245, 247, 255); // indigo-50
+  doc.roundedRect(margin, y, contentWidth, noticeH, 3, 3, 'FD');
+  doc.setFillColor(79, 70, 229); // indigo-600
+  doc.rect(margin, y, 3.5, noticeH, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(67, 56, 202); // indigo-700
+  doc.text(tr.seeAnswerSheetNotice, margin + 12, y + 15);
+  y += noticeH + 16;
+
   rawQuestions.forEach((q, idx) => {
     const typeCode = q.typeCode || q.type_code || 'MCQ_SINGLE';
     const bodyMd = (q.bodyMd ?? q.body_md ?? '').trim();
@@ -716,36 +741,40 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
 
     // Ensure we don't start question right at bottom of page
     const bodyLines = doc.splitTextToSize(bodyMd, contentWidth - 10);
-    const estimatedH = 40 + bodyLines.length * 13;
-    ensureSpace(Math.min(estimatedH, 120), tr.questionPaperTitle);
+    const estimatedH = 45 + bodyLines.length * 14;
+    ensureSpace(Math.min(estimatedH, 140), tr.questionPaperTitle);
 
     // Exercise separator
-    if (idx > 0 && y > margin + 20) {
+    if (idx > 0 && y > margin + 25) {
       doc.setDrawColor(241, 245, 249);
-      doc.setLineWidth(0.5);
-      doc.line(margin, y - 6, pageWidth - margin, y - 6);
+      doc.setLineWidth(0.65);
+      doc.line(margin, y - 8, pageWidth - margin, y - 8);
     }
 
-    // Exercise Header
+    // Exercise Header with clean wrapping to avoid any overlap with points badge
     doc.setFont('times', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(15, 23, 42);
     const exHeader = `${tr.exercise} ${idx + 1}${qTitle ? ` : ${qTitle}` : ''}`;
-    doc.text(exHeader, margin, y);
 
-    const titleW = doc.getTextWidth(exHeader);
-    if (titleW < contentWidth - 130) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`— ${typeLabel}`, margin + titleW + 8, y);
-    }
+    const ptsW = doc.getTextWidth(ptsText) + 8;
+    const maxTitleW = contentWidth - ptsW - 12;
+    const exHeaderLines = doc.splitTextToSize(exHeader, maxTitleW);
 
+    doc.text(exHeaderLines, margin, y);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(51, 65, 85);
     doc.text(ptsText, pageWidth - margin, y, { align: 'right' });
-    y += 14;
+
+    y += exHeaderLines.length * 14 + 3;
+
+    // Subtitle type
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(typeLabel, margin, y);
+    y += 11;
 
     // Attachments indicator
     if (attachments.length > 0) {
@@ -757,17 +786,19 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
         if (att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/')) icon = `🔊 ${tr.attachmentAudio}`;
         else if (att.mime_type?.startsWith('video/') || att.mimeType?.startsWith('video/')) icon = `🎬 ${tr.attachmentVideo}`;
         doc.text(`[ ${icon} : ${att.filename} ]`, margin, y);
-        y += 11;
+        y += 12;
       });
       y += 2;
     }
 
     // Question Body / Statement
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(30, 41, 59);
-    doc.text(bodyLines, margin, y);
-    y += bodyLines.length * 13 + 6;
+    if (bodyLines.length > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text(bodyLines, margin, y, { lineHeightFactor: 1.35 });
+      y += bodyLines.length * 13 + 8;
+    }
 
     // Options for MCQ / True-False
     if (typeCode === 'MCQ_SINGLE' || typeCode === 'MCQ_MULTI' || typeCode === 'TRUE_FALSE') {
@@ -775,7 +806,7 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
         const optText = (opt.bodyMd ?? opt.body_md ?? '').trim();
         const letter = String.fromCharCode(65 + oIdx);
         const optLines = doc.splitTextToSize(optText, contentWidth - 36);
-        ensureSpace(optLines.length * 12 + 4, tr.questionPaperTitle);
+        ensureSpace(optLines.length * 13 + 6, tr.questionPaperTitle);
 
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
@@ -784,61 +815,56 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(30, 41, 59);
-        doc.text(optLines, margin + 24, y);
-        y += optLines.length * 12 + 4;
+        doc.text(optLines, margin + 26, y, { lineHeightFactor: 1.3 });
+        y += optLines.length * 13 + 5;
       });
-      y += 4;
+      y += 6;
     } else if (typeCode === 'MATCHING' && Array.isArray(config.pairs)) {
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
       doc.text(tr.matchingPrompt, margin, y);
-      y += 11;
+      y += 12;
       config.pairs.forEach((p, pIdx) => {
-        ensureSpace(16, tr.questionPaperTitle);
+        ensureSpace(18, tr.questionPaperTitle);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(30, 41, 59);
-        doc.text(`${pIdx + 1}.  ${p.left || ''}`, margin + 8, y);
-        doc.text(`${String.fromCharCode(65 + pIdx)}.  ${p.right || ''}`, margin + 220, y);
-        y += 14;
+        doc.text(`${pIdx + 1}.  ${p.left || ''}`, margin + 10, y);
+        doc.text(`${String.fromCharCode(65 + pIdx)}.  ${p.right || ''}`, margin + 230, y);
+        y += 15;
       });
-      y += 4;
+      y += 6;
     } else if (typeCode === 'ORDERING' && Array.isArray(config.items)) {
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
       doc.text(tr.orderingPrompt, margin, y);
-      y += 11;
+      y += 12;
       config.items.forEach((item, iIdx) => {
-        ensureSpace(15, tr.questionPaperTitle);
+        ensureSpace(16, tr.questionPaperTitle);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(30, 41, 59);
         doc.text(`• ${item}`, margin + 12, y);
-        y += 14;
+        y += 15;
       });
-      y += 4;
+      y += 6;
     } else if (typeCode === 'CODE' && config.starterCode) {
       const codeLines = doc.splitTextToSize(config.starterCode, contentWidth - 30);
-      const codeBoxH = codeLines.length * 12 + 16;
-      ensureSpace(codeBoxH + 10, tr.questionPaperTitle);
+      const codeBoxH = codeLines.length * 13 + 18;
+      ensureSpace(codeBoxH + 12, tr.questionPaperTitle);
       doc.setDrawColor(226, 232, 240);
       doc.setFillColor(248, 250, 252);
       doc.roundedRect(margin, y, contentWidth, codeBoxH, 3, 3, 'FD');
       doc.setFont('courier', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(30, 41, 59);
-      doc.text(codeLines, margin + 12, y + 13);
-      y += codeBoxH + 6;
+      doc.text(codeLines, margin + 12, y + 14, { lineHeightFactor: 1.3 });
+      y += codeBoxH + 8;
     }
 
-    // Direct reminder note to answer in Answer Booklet
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text(tr.seeAnswerSheetNotice, margin, y);
-    y += 14;
+    y += 10;
   });
 
   // ==========================================
@@ -857,7 +883,7 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   doc.setFontSize(10);
   doc.setTextColor(79, 70, 229);
   doc.text(tr.answerBookletTitle, pageWidth / 2, y + 17, { align: 'center' });
-  y += 32;
+  y += 34;
 
   // Candidate Quick-Reminder Bar
   doc.setDrawColor(203, 213, 225);
@@ -867,7 +893,7 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
   doc.text(tr.candidateReminder, margin + 10, y + 15);
-  y += 30;
+  y += 32;
 
   // Answer space for every question
   rawQuestions.forEach((q, idx) => {
@@ -884,200 +910,322 @@ export function exportExamPaperToPdf(examData, selectedCourse = null, { filename
     const isShortText = typeCode === 'SHORT_TEXT';
     const isCode = typeCode === 'CODE';
 
-    let neededH = 50;
+    let neededH = 55;
     if (typeCode === 'MCQ_SINGLE' || typeCode === 'MCQ_MULTI' || typeCode === 'TRUE_FALSE') {
-      neededH = 46;
+      neededH = 52;
     } else if (isCode) {
-      const lines = maxTeacherLines || 18;
-      neededH = lines * 14 + 36;
+      const lines = Math.max(1, maxTeacherLines || 18);
+      neededH = lines * 18 + 40;
     } else if (isEssay || isLongText || isShortText) {
-      const lines = maxTeacherLines || (isEssay ? 14 : isLongText ? 10 : 5);
-      neededH = lines * 19 + 32;
+      const lines = Math.max(1, maxTeacherLines || (isEssay ? 14 : isLongText ? 10 : 5));
+      neededH = lines * 20 + 40;
     } else if (typeCode === 'NUMERIC') {
-      neededH = 74;
+      neededH = 96;
     } else if (typeCode === 'MATCHING' && Array.isArray(config.pairs)) {
-      neededH = config.pairs.length * 18 + 32;
+      neededH = config.pairs.length * 20 + 45;
     } else if (typeCode === 'ORDERING' && Array.isArray(config.items)) {
-      neededH = config.items.length * 17 + 32;
+      neededH = 65;
+    } else if (typeCode === 'FILL_BLANK') {
+      const blanksCount = Array.isArray(config.blanks) && config.blanks.length > 0 ? config.blanks.length : 1;
+      neededH = blanksCount * 22 + 40;
     }
 
-    ensureSpace(Math.min(neededH, 180), tr.answerBookletTitle);
+    // Check space before drawing exercise block so it doesn't split awkwardly
+    ensureSpace(Math.min(neededH, pageHeight - margin * 2 - 30), tr.answerBookletTitle);
 
-    // Answer block header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    // Answer block header with points badge on the right
+    doc.setFont('times', 'bold');
+    doc.setFontSize(10.5);
     doc.setTextColor(15, 23, 42);
-    const exAnsTitle = `${tr.exercise} ${idx + 1}${qTitle ? ` : ${qTitle}` : ''}  [ ${points} ${tr.points} ]`;
-    doc.text(exAnsTitle, margin, y);
-    y += 12;
+    const exAnsTitle = `${tr.exercise} ${idx + 1}${qTitle ? ` : ${qTitle}` : ''}`;
+    const ptsAnsText = `[ ${points} ${points === 1 ? tr.point : tr.points} ]`;
+
+    const ptsAnsW = doc.getTextWidth(ptsAnsText) + 6;
+    const maxAnsTitleW = contentWidth - ptsAnsW - 10;
+    const ansTitleLines = doc.splitTextToSize(exAnsTitle, maxAnsTitleW);
+
+    doc.text(ansTitleLines, margin, y);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(ptsAnsText, pageWidth - margin, y, { align: 'right' });
+
+    y += ansTitleLines.length * 13 + 6;
 
     // Specific Answer Spaces:
     if (typeCode === 'MCQ_SINGLE' || typeCode === 'MCQ_MULTI' || typeCode === 'TRUE_FALSE') {
       // Clean Option Checkboxes grid
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
+      doc.setFontSize(8.5);
       doc.setTextColor(100, 116, 139);
-      doc.text("Cochez la réponse :", margin + 8, y + 4);
+      doc.text(tr.checkAnswer || "Cochez la réponse :", margin + 8, y + 13);
 
-      let optX = margin + 110;
+      const optBoxW = 36;
+      const optBoxH = 18;
+      let optX = margin + 130;
+      let optY = y;
+
       options.forEach((opt, oIdx) => {
         const letter = String.fromCharCode(65 + oIdx);
-        doc.setDrawColor(148, 163, 184);
+
+        if (optX + optBoxW > pageWidth - margin) {
+          optX = margin + 130;
+          optY += optBoxH + 6;
+          ensureSpace(optBoxH + 6, tr.answerBookletTitle);
+        }
+
+        doc.setDrawColor(148, 163, 184); // slate-400
         doc.setFillColor(255, 255, 255);
-        doc.roundedRect(optX, y - 6, 28, 14, 2, 2, 'FD');
+        doc.roundedRect(optX, optY, optBoxW, optBoxH, 3, 3, 'FD');
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
+        doc.setFontSize(9);
         doc.setTextColor(30, 41, 59);
-        doc.text(`[  ] ${letter}`, optX + 4, y + 4);
-        optX += 40;
+        doc.text(`[  ] ${letter}`, optX + 6, optY + 12);
+        optX += optBoxW + 8;
       });
-      y += 18;
+
+      y = optY + optBoxH + 16;
 
     } else if (isCode) {
       // Code Response Container (configured lines by teacher)
-      const linesCount = maxTeacherLines || 18;
-      const codeBoxH = linesCount * 14 + 18;
+      const linesCount = Math.max(1, maxTeacherLines || 18);
+      const lineHeight = 18;
+      const headerH = 22;
+      const codeBoxH = linesCount * lineHeight + headerH + 6;
 
-      doc.setDrawColor(203, 213, 225);
-      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(203, 213, 225); // slate-300
+      doc.setFillColor(248, 250, 252); // slate-50
       doc.roundedRect(margin, y, contentWidth, codeBoxH, 3, 3, 'FD');
 
+      // Top title bar inside the box
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`${tr.codeLabel} (${config.language || 'Code'}) — ${linesCount} lignes max`, margin + 8, y + 10);
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105); // slate-600
+      const langLabel = config.language || 'Code';
+      doc.text(`${tr.codeLabel} (${langLabel}) — Max ${linesCount} lignes`, margin + 10, y + 15);
 
-      let codeLineY = y + 21;
+      // Divider line separating title bar from code lines
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.65);
+      doc.line(margin, y + headerH, pageWidth - margin, y + headerH);
+
+      // Vertical line separating line numbers gutter from writing area
+      const gutterW = 34;
+      doc.line(margin + gutterW, y + headerH, margin + gutterW, y + codeBoxH);
+
+      let curLineY = y + headerH;
       doc.setFont('courier', 'normal');
       doc.setFontSize(8);
 
       for (let l = 0; l < linesCount; l++) {
-        doc.setTextColor(148, 163, 184);
-        doc.text(`${String(l + 1).padStart(2, ' ')} |`, margin + 10, codeLineY);
+        curLineY += lineHeight;
 
+        // Line number in gutter
+        doc.setTextColor(148, 163, 184); // slate-400
+        const lineNumStr = String(l + 1).padStart(2, ' ');
+        doc.text(lineNumStr, margin + 10, curLineY - 4);
+
+        // Subtle ruled dotted line for student code writing
         doc.setDrawColor(226, 232, 240);
-        doc.setLineDashPattern([1, 3], 0);
-        doc.line(margin + 32, codeLineY, pageWidth - margin - 8, codeLineY);
+        doc.setLineDashPattern([1.5, 2.5], 0);
+        doc.line(margin + gutterW + 6, curLineY, pageWidth - margin - 8, curLineY);
         doc.setLineDashPattern([], 0);
-        codeLineY += 14;
       }
-      y += codeBoxH + 12;
+
+      y += codeBoxH + 16;
 
     } else if (isEssay || isLongText || isShortText) {
       // Essay / Long / Short Text writing lines (configured lines by teacher)
-      const linesCount = maxTeacherLines || (isEssay ? 14 : isLongText ? 10 : 5);
-      const boxH = linesCount * 19 + 16;
+      const defaultLines = isEssay ? 14 : isLongText ? 10 : 5;
+      const linesCount = Math.max(1, maxTeacherLines || defaultLines);
+      const lineSpacing = 20;
+      const headerH = 22;
+      const boxH = linesCount * lineSpacing + headerH + 8;
 
-      doc.setDrawColor(226, 232, 240);
+      doc.setDrawColor(226, 232, 240); // slate-200
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(margin, y, contentWidth, boxH, 3, 3, 'FD');
 
+      // Top title bar inside the box
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(tr.workSpaceLabel, margin + 8, y + 10);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text(tr.workSpaceLabel, margin + 10, y + 15);
 
       const maxW = config.maxWords || config.wordLimit;
       if (maxW) {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
+        doc.setFontSize(8);
         doc.setTextColor(148, 163, 184);
-        doc.text(`(${tr.maxWords} : ${maxW} ${tr.words})`, pageWidth - margin - 8, y + 10, { align: 'right' });
+        doc.text(`(${tr.maxWords} : ${maxW} ${tr.words})`, pageWidth - margin - 10, y + 15, { align: 'right' });
       }
 
-      drawRuledDottedLines(doc, margin + 8, pageWidth - margin - 8, y + 8, linesCount, 19);
-      y += boxH + 12;
+      // Draw clean ruled dotted lines
+      let curDottedY = y + headerH;
+      doc.setDrawColor(203, 213, 225); // slate-300
+      doc.setLineWidth(0.65);
+      doc.setLineDashPattern([2, 2.5], 0);
+      for (let i = 0; i < linesCount; i++) {
+        curDottedY += lineSpacing;
+        doc.line(margin + 10, curDottedY, pageWidth - margin - 10, curDottedY);
+      }
+      doc.setLineDashPattern([], 0);
+
+      y += boxH + 16;
 
     } else if (typeCode === 'NUMERIC') {
       // Numeric Calculation & Final Answer Card
+      const numBoxH = 80;
+
       doc.setDrawColor(226, 232, 240);
       doc.setFillColor(250, 252, 255);
-      doc.roundedRect(margin, y, contentWidth, 58, 3, 3, 'FD');
+      doc.roundedRect(margin, y, contentWidth, numBoxH, 3, 3, 'FD');
 
+      // Final Answer section
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
       doc.setTextColor(51, 65, 85);
-      doc.text(tr.answerLabel, margin + 10, y + 17);
+      doc.text(tr.answerLabel, margin + 12, y + 18);
 
       doc.setDrawColor(148, 163, 184);
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(margin + 90, y + 7, 180, 17, 2, 2, 'FD');
+      doc.roundedRect(margin + 110, y + 6, 160, 20, 2, 2, 'FD');
 
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text(tr.workSpaceLabel, margin + 10, y + 36);
-      drawRuledDottedLines(doc, margin + 10, pageWidth - margin - 10, y + 26, 1, 16);
+      // Calculation area below
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(tr.workSpaceLabel, margin + 12, y + 42);
 
-      y += 66;
+      let calcY = y + 44;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.65);
+      doc.setLineDashPattern([2, 2.5], 0);
+      for (let c = 0; c < 2; c++) {
+        calcY += 15;
+        doc.line(margin + 12, calcY, pageWidth - margin - 12, calcY);
+      }
+      doc.setLineDashPattern([], 0);
+
+      y += numBoxH + 16;
 
     } else if (typeCode === 'MATCHING' && Array.isArray(config.pairs)) {
       // Matching Answer Boxes
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(tr.matchingPrompt, margin + 8, y);
-      y += 10;
+      const pairRows = config.pairs.length;
+      const matchBoxH = pairRows * 20 + 26;
 
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, contentWidth, matchBoxH, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(tr.matchingPrompt, margin + 10, y + 14);
+
+      let curPairY = y + 18;
       config.pairs.forEach((p, pIdx) => {
+        curPairY += 20;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(30, 41, 59);
-        doc.text(`${pIdx + 1}.  ${p.left || ''}`, margin + 12, y);
+        const leftLabel = `${pIdx + 1}.  ${p.left || ''}`;
+        const truncatedLeft = doc.splitTextToSize(leftLabel, contentWidth * 0.6)[0];
+        doc.text(truncatedLeft, margin + 12, curPairY - 4);
 
         doc.setDrawColor(148, 163, 184);
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(margin + 200, y - 8, 36, 12, 2, 2, 'FD');
+        doc.setFillColor(250, 252, 255);
+        doc.roundedRect(margin + contentWidth * 0.65, curPairY - 14, 50, 15, 2, 2, 'FD');
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7.5);
+        doc.setFontSize(8);
         doc.setTextColor(148, 163, 184);
-        doc.text(`[ ___ ]`, margin + 207, y);
-
-        y += 16;
+        doc.text(`[ ___ ]`, margin + contentWidth * 0.65 + 12, curPairY - 3);
       });
-      y += 8;
+
+      y += matchBoxH + 16;
 
     } else if (typeCode === 'ORDERING' && Array.isArray(config.items)) {
       // Ordering Sequence Boxes
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(tr.orderingPrompt, margin + 8, y);
-      y += 10;
+      const itemsCount = config.items.length;
+      const rows = Math.ceil((itemsCount * 56) / (contentWidth - 24)) || 1;
+      const ordBoxH = rows * 26 + 26;
 
-      let ordX = margin + 10;
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, contentWidth, ordBoxH, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(tr.orderingPrompt, margin + 10, y + 14);
+
+      let ordX = margin + 12;
+      let curOrdY = y + 26;
       config.items.forEach((_, iIdx) => {
+        if (ordX + 50 > pageWidth - margin - 12) {
+          ordX = margin + 12;
+          curOrdY += 24;
+        }
+
         doc.setDrawColor(148, 163, 184);
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(ordX, y - 6, 48, 14, 2, 2, 'FD');
+        doc.setFillColor(250, 252, 255);
+        doc.roundedRect(ordX, curOrdY, 46, 16, 2, 2, 'FD');
 
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
+        doc.setFontSize(8);
         doc.setTextColor(51, 65, 85);
-        doc.text(`${iIdx + 1}: [ ___ ]`, ordX + 4, y + 4);
-        ordX += 56;
+        doc.text(`${iIdx + 1}: [ ___ ]`, ordX + 4, curOrdY + 11);
+        ordX += 52;
       });
-      y += 18;
+
+      y += ordBoxH + 16;
 
     } else if (typeCode === 'FILL_BLANK') {
       const blanksCount = Array.isArray(config.blanks) && config.blanks.length > 0 ? config.blanks.length : 1;
+      const fillBoxH = blanksCount * 22 + 20;
+
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, contentWidth, fillBoxH, 3, 3, 'FD');
+
+      let curBlankY = y + 6;
       for (let b = 0; b < blanksCount; b++) {
+        curBlankY += 22;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(71, 85, 105);
-        doc.text(`Blank ${b + 1} : `, margin + 10, y);
+        const blankPrefix = `${tr.blankLabel || 'Trou'} ${b + 1} : `;
+        doc.text(blankPrefix, margin + 12, curBlankY - 4);
+
+        const prefixW = doc.getTextWidth(blankPrefix);
         doc.setDrawColor(148, 163, 184);
-        doc.setLineDashPattern([2, 2], 0);
-        doc.line(margin + 55, y, margin + 300, y);
+        doc.setLineDashPattern([2, 2.5], 0);
+        doc.line(margin + 12 + prefixW + 4, curBlankY - 4, pageWidth - margin - 14, curBlankY - 4);
         doc.setLineDashPattern([], 0);
-        y += 16;
       }
-      y += 6;
+
+      y += fillBoxH + 16;
 
     } else {
-      drawRuledDottedLines(doc, margin + 8, pageWidth - margin - 8, y + 2, 4, 18);
-      y += 74;
+      const fallbackLines = 4;
+      const fallbackH = fallbackLines * 20 + 20;
+
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, contentWidth, fallbackH, 3, 3, 'FD');
+
+      let curDottedY = y + 10;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.65);
+      doc.setLineDashPattern([2, 2.5], 0);
+      for (let i = 0; i < fallbackLines; i++) {
+        curDottedY += 20;
+        doc.line(margin + 10, curDottedY, pageWidth - margin - 10, curDottedY);
+      }
+      doc.setLineDashPattern([], 0);
+
+      y += fallbackH + 16;
     }
 
     y += 10;
