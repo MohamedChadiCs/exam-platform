@@ -459,44 +459,49 @@ export default function TakeExam() {
           {q.bodyMd}
         </div>
 
-        {/* Question Attachments (Images, Audio, Video) */}
+        {/* Inline Attachments (Images, Audio, Video) */}
         {q.attachments && q.attachments.length > 0 && (
-          <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-              <Paperclip size={13} className="text-slate-500" />
-              <span>Attachments ({q.attachments.length})</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {q.attachments.map((att, aIdx) => (
-                <div key={att.id || aIdx} className="overflow-hidden rounded-md border border-slate-200 bg-white p-2">
-                  {att.mime_type?.startsWith('image/') || att.mimeType?.startsWith('image/') ? (
-                    <div>
-                      <img
-                        src={att.url}
-                        alt={att.filename}
-                        className="max-h-64 w-full rounded object-contain bg-slate-50"
-                      />
-                      <div className="mt-1 text-[11px] font-medium text-slate-600 truncate">{att.filename}</div>
-                    </div>
-                  ) : att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/') ? (
-                    <div>
+          <div className="mt-3 space-y-3">
+            {q.attachments.map((att, aIdx) => {
+              const mime = att.mime_type || att.mimeType || '';
+              const isImage = mime.startsWith('image/');
+              const isAudio = mime.startsWith('audio/');
+              const isVideo = mime.startsWith('video/');
+              const mediaSrc = att.url || (att.dataBase64 ? `data:${mime};base64,${att.dataBase64}` : '');
+              const displayWidth = att.displayWidth || '100%';
+              const displayAlign = att.displayAlign || 'center';
+              const justifyClass = displayAlign === 'left' ? 'justify-start' : displayAlign === 'right' ? 'justify-end' : 'justify-center';
+
+              return (
+                <div key={att.id || aIdx} className={`flex ${justifyClass}`}>
+                  {isImage && (
+                    <img
+                      src={mediaSrc}
+                      alt={att.filename}
+                      style={{ width: displayWidth, maxWidth: '100%' }}
+                      className="rounded border border-slate-200 object-contain"
+                    />
+                  )}
+                  {isAudio && (
+                    <div className="w-full max-w-md">
                       <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-700 truncate">
                         <Music size={14} className="text-amber-600 shrink-0" />
                         <span className="truncate">{att.filename}</span>
                       </div>
-                      <audio controls src={att.url} className="w-full h-8" />
+                      <audio controls src={mediaSrc} className="w-full" />
                     </div>
-                  ) : att.mime_type?.startsWith('video/') || att.mimeType?.startsWith('video/') ? (
-                    <div>
-                      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-700 truncate">
-                        <Video size={14} className="text-blue-600 shrink-0" />
-                        <span className="truncate">{att.filename}</span>
-                      </div>
-                      <video controls src={att.url} className="max-h-60 w-full rounded bg-black" />
-                    </div>
-                  ) : (
+                  )}
+                  {isVideo && (
+                    <video
+                      controls
+                      src={mediaSrc}
+                      style={{ width: displayWidth, maxWidth: '100%' }}
+                      className="rounded bg-black"
+                    />
+                  )}
+                  {!isImage && !isAudio && !isVideo && (
                     <a
-                      href={att.url}
+                      href={mediaSrc}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center gap-2 text-xs font-medium text-mark hover:underline"
@@ -506,8 +511,8 @@ export default function TakeExam() {
                     </a>
                   )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
 

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Plus, Trash2, ArrowUp, ArrowDown, Save, Send, Settings,
   CheckCircle2, Clock, Award, BookOpen, Library, HelpCircle, FileText, Tag, FolderPlus, FileDown,
-  Paperclip, Image, Music, Video, Upload
+  Paperclip, Image, Music, Video, Upload, AlignLeft, AlignCenter, AlignRight, GripVertical, Maximize2, Minimize2
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { exportExamPaperToPdf, sanitizeFilename } from '../lib/exportUtils';
@@ -284,6 +284,20 @@ export default function ExamPaperEditor() {
   function removeAttachment(qIdx, aIdx) {
     const currentAtts = [...(questions[qIdx].attachments || [])];
     currentAtts.splice(aIdx, 1);
+    updateQuestion(qIdx, { attachments: currentAtts });
+  }
+
+  function updateAttachment(qIdx, aIdx, fields) {
+    const currentAtts = [...(questions[qIdx].attachments || [])];
+    currentAtts[aIdx] = { ...currentAtts[aIdx], ...fields };
+    updateQuestion(qIdx, { attachments: currentAtts });
+  }
+
+  function moveAttachment(qIdx, aIdx, dir) {
+    const currentAtts = [...(questions[qIdx].attachments || [])];
+    const target = aIdx + dir;
+    if (target < 0 || target >= currentAtts.length) return;
+    [currentAtts[aIdx], currentAtts[target]] = [currentAtts[target], currentAtts[aIdx]];
     updateQuestion(qIdx, { attachments: currentAtts });
   }
 
@@ -792,7 +806,7 @@ export default function ExamPaperEditor() {
                 />
               </div>
 
-              {/* Attachments Section (Images, Audio, Video) */}
+              {/* Inline Media Attachments (Images, Audio, Video) */}
               <div className="mt-2 rounded-md border border-dashed border-slate-200 bg-slate-50/70 p-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
@@ -800,7 +814,7 @@ export default function ExamPaperEditor() {
                     <span>Media Attachments</span>
                     <span className="text-[10px] text-slate-400 font-normal">(Images, Audio, Video)</span>
                     {q.attachments?.length > 0 && (
-                      <span className="rounded-full bg-slate-200 px-1.5 py-0.2 text-[10px] font-bold text-slate-700">
+                      <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
                         {q.attachments.length}
                       </span>
                     )}
@@ -819,53 +833,142 @@ export default function ExamPaperEditor() {
                 </div>
 
                 {q.attachments && q.attachments.length > 0 && (
-                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {q.attachments.map((att, aIdx) => (
-                      <div
-                        key={att.id || aIdx}
-                        className="relative flex items-center gap-2 rounded border border-slate-200 bg-white p-2 shadow-2xs"
-                      >
-                        {att.mime_type?.startsWith('image/') || att.mimeType?.startsWith('image/') ? (
-                          <img
-                            src={att.url || (att.dataBase64 ? `data:${att.mime_type || att.mimeType};base64,${att.dataBase64}` : '')}
-                            alt={att.filename}
-                            className="h-12 w-12 rounded object-cover border border-slate-100 shrink-0"
-                          />
-                        ) : att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/') ? (
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-amber-50 text-amber-600">
-                            <Music size={20} />
-                          </div>
-                        ) : (
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-blue-50 text-blue-600">
-                            <Video size={20} />
-                          </div>
-                        )}
+                  <div className="mt-3 space-y-3">
+                    {q.attachments.map((att, aIdx) => {
+                      const mime = att.mime_type || att.mimeType || '';
+                      const isImage = mime.startsWith('image/');
+                      const isAudio = mime.startsWith('audio/');
+                      const isVideo = mime.startsWith('video/');
+                      const mediaSrc = att.url || (att.dataBase64 ? `data:${mime};base64,${att.dataBase64}` : '');
+                      const displayWidth = att.displayWidth || '100%';
+                      const displayAlign = att.displayAlign || 'center';
+                      const alignClass = displayAlign === 'left' ? 'items-start' : displayAlign === 'right' ? 'items-end' : 'items-center';
 
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-xs font-medium text-slate-800" title={att.filename}>
-                            {att.filename}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {att.mime_type || att.mimeType || 'file'} {att.size_bytes ? `• ${Math.round(att.size_bytes / 1024)} KB` : ''}
-                          </div>
-                          {(att.mime_type?.startsWith('audio/') || att.mimeType?.startsWith('audio/')) && (
-                            <audio controls src={att.url || (att.dataBase64 ? `data:${att.mime_type || att.mimeType};base64,${att.dataBase64}` : '')} className="mt-1 h-6 w-full" />
-                          )}
-                          {(att.mime_type?.startsWith('video/') || att.mimeType?.startsWith('video/')) && (
-                            <video controls src={att.url || (att.dataBase64 ? `data:${att.mime_type || att.mimeType};base64,${att.dataBase64}` : '')} className="mt-1 max-h-24 w-full rounded" />
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(idx, aIdx)}
-                          className="text-slate-300 hover:text-red-500 p-1 shrink-0"
-                          title="Remove attachment"
+                      return (
+                        <div
+                          key={att.id || aIdx}
+                          className="rounded-lg border border-slate-200 bg-white shadow-2xs overflow-hidden"
                         >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
+                          {/* Attachment toolbar */}
+                          <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/80 px-2.5 py-1.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {isImage ? <Image size={13} className="text-emerald-600 shrink-0" /> :
+                               isAudio ? <Music size={13} className="text-amber-600 shrink-0" /> :
+                               isVideo ? <Video size={13} className="text-blue-600 shrink-0" /> :
+                               <Paperclip size={13} className="text-slate-500 shrink-0" />}
+                              <span className="truncate text-[11px] font-medium text-slate-700" title={att.filename}>
+                                {att.filename}
+                              </span>
+                              <span className="text-[10px] text-slate-400 shrink-0">
+                                {att.size_bytes ? `${Math.round(att.size_bytes / 1024)} KB` : ''}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {/* Size control for images and videos */}
+                              {(isImage || isVideo) && (
+                                <select
+                                  value={displayWidth}
+                                  onChange={(e) => updateAttachment(idx, aIdx, { displayWidth: e.target.value })}
+                                  className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-600 hover:border-slate-300 focus:outline-none focus:border-mark cursor-pointer"
+                                  title="Display width"
+                                >
+                                  <option value="25%">25%</option>
+                                  <option value="33%">33%</option>
+                                  <option value="50%">50%</option>
+                                  <option value="75%">75%</option>
+                                  <option value="100%">100%</option>
+                                </select>
+                              )}
+
+                              {/* Alignment controls */}
+                              {(isImage || isVideo) && (
+                                <div className="flex items-center rounded border border-slate-200 bg-white overflow-hidden">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateAttachment(idx, aIdx, { displayAlign: 'left' })}
+                                    className={`p-0.5 ${displayAlign === 'left' ? 'bg-mark/10 text-mark' : 'text-slate-400 hover:text-slate-600'}`}
+                                    title="Align left"
+                                  ><AlignLeft size={11} /></button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateAttachment(idx, aIdx, { displayAlign: 'center' })}
+                                    className={`p-0.5 border-x border-slate-200 ${displayAlign === 'center' ? 'bg-mark/10 text-mark' : 'text-slate-400 hover:text-slate-600'}`}
+                                    title="Align center"
+                                  ><AlignCenter size={11} /></button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateAttachment(idx, aIdx, { displayAlign: 'right' })}
+                                    className={`p-0.5 ${displayAlign === 'right' ? 'bg-mark/10 text-mark' : 'text-slate-400 hover:text-slate-600'}`}
+                                    title="Align right"
+                                  ><AlignRight size={11} /></button>
+                                </div>
+                              )}
+
+                              {/* Move up / down */}
+                              <button
+                                type="button"
+                                onClick={() => moveAttachment(idx, aIdx, -1)}
+                                disabled={aIdx === 0}
+                                className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Move up"
+                              ><ArrowUp size={12} /></button>
+                              <button
+                                type="button"
+                                onClick={() => moveAttachment(idx, aIdx, 1)}
+                                disabled={aIdx === q.attachments.length - 1}
+                                className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Move down"
+                              ><ArrowDown size={12} /></button>
+
+                              {/* Remove */}
+                              <button
+                                type="button"
+                                onClick={() => removeAttachment(idx, aIdx)}
+                                className="p-0.5 text-slate-300 hover:text-red-500"
+                                title="Remove attachment"
+                              ><Trash2 size={12} /></button>
+                            </div>
+                          </div>
+
+                          {/* Inline media preview */}
+                          <div className={`flex flex-col ${alignClass} p-3`}>
+                            {isImage && (
+                              <img
+                                src={mediaSrc}
+                                alt={att.filename}
+                                style={{ width: displayWidth, maxWidth: '100%' }}
+                                className="rounded border border-slate-100 object-contain"
+                              />
+                            )}
+                            {isAudio && (
+                              <div className="w-full max-w-md">
+                                <audio controls src={mediaSrc} className="w-full" />
+                              </div>
+                            )}
+                            {isVideo && (
+                              <video
+                                controls
+                                src={mediaSrc}
+                                style={{ width: displayWidth, maxWidth: '100%' }}
+                                className="rounded bg-black"
+                              />
+                            )}
+                            {!isImage && !isAudio && !isVideo && (
+                              <a
+                                href={mediaSrc}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-2 text-xs font-medium text-mark hover:underline"
+                              >
+                                <Paperclip size={14} />
+                                <span>{att.filename}</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
