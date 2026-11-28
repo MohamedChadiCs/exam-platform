@@ -116,6 +116,9 @@ export default function CodeMorph({
   title,
   placeholder,
   className = '',
+  preventPaste = false,
+  disableCopy = false,
+  onPasteBlocked,
 }) {
   // Normalize snippets input
   const normalizedSnippets = useMemo(() => {
@@ -150,8 +153,14 @@ export default function CodeMorph({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // Handle Tab key insertion (2 spaces)
+  // Handle Tab key insertion (2 spaces) & prevent paste if enabled
   function handleKeyDown(e) {
+    if (preventPaste && (e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+      e.preventDefault();
+      e.stopPropagation();
+      onPasteBlocked?.();
+      return;
+    }
     if (e.key === 'Tab') {
       e.preventDefault();
       const start = e.target.selectionStart;
@@ -279,24 +288,26 @@ export default function CodeMorph({
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="flex items-center gap-1 rounded px-2 py-0.5 text-[10.5px] text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
-            title="Copy code"
-          >
-            {copied ? (
-              <>
-                <Check size={11} className="text-emerald-400" />
-                <span className="text-emerald-400">Copied</span>
-              </>
-            ) : (
-              <>
-                <Copy size={11} />
-                <span className="hidden sm:inline">Copy</span>
-              </>
-            )}
-          </button>
+          {!disableCopy && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex items-center gap-1 rounded px-2 py-0.5 text-[10.5px] text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+              title="Copy code"
+            >
+              {copied ? (
+                <>
+                  <Check size={11} className="text-emerald-400" />
+                  <span className="text-emerald-400">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={11} />
+                  <span className="hidden sm:inline">Copy</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -319,6 +330,16 @@ export default function CodeMorph({
               value={activeCode}
               onChange={(e) => onChange?.(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={preventPaste ? (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onPasteBlocked?.();
+              } : undefined}
+              onDrop={preventPaste ? (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onPasteBlocked?.();
+              } : undefined}
               placeholder={placeholder || '// Enter code here directly...'}
               rows={Math.max(6, lineCount)}
               className="w-full flex-1 resize-none border-0 bg-transparent ps-3 p-0 font-mono text-[11px] leading-[18px] text-slate-100 placeholder-slate-600 outline-none focus:ring-0 selection:bg-mark/40 selection:text-white"

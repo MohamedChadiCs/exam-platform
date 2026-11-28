@@ -31,10 +31,12 @@ export default function TakeExam() {
   const [securityWarnings, setSecurityWarnings] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
   const [terminatedReason, setTerminatedReason] = useState(null);
+  const [pasteWarning, setPasteWarning] = useState(false);
 
   const seqRef = useRef(1);
   const enteredFullscreenRef = useRef(!!document.fullscreenElement);
   const terminatingRef = useRef(false);
+  const pasteTimerRef = useRef(null);
 
   async function enterFullscreen() {
     try {
@@ -154,6 +156,66 @@ export default function TakeExam() {
       window.removeEventListener('blur', onBlur);
     };
   }, [session, sessionId]);
+
+  function triggerPasteBlockedNotice() {
+    setPasteWarning(true);
+    if (pasteTimerRef.current) clearTimeout(pasteTimerRef.current);
+    pasteTimerRef.current = setTimeout(() => {
+      setPasteWarning(false);
+    }, 4000);
+
+    if (session && session.status === 'IN_PROGRESS') {
+      setSecurityWarnings((w) => w + 1);
+      api.post(`/student/sessions/${sessionId}/security-event`, {
+        eventType: 'PASTE_ATTEMPT',
+        severity: 'WARNING',
+        details: { message: 'Student attempted to paste into examination answers' },
+        clientTs: new Date().toISOString(),
+      }).catch(() => {});
+    }
+  }
+
+  // Strict Anti-Paste Enforcement in Examination Mode
+  useEffect(() => {
+    if (!session || session.status !== 'IN_PROGRESS' || terminatedReason) return;
+
+    function onPaste(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      triggerPasteBlockedNotice();
+    }
+
+    function onDrop(e) {
+      const target = e.target;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerPasteBlockedNotice();
+      }
+    }
+
+    function onKeyDown(e) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+        const target = e.target;
+        if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) {
+          e.preventDefault();
+          e.stopPropagation();
+          triggerPasteBlockedNotice();
+        }
+      }
+    }
+
+    document.addEventListener('paste', onPaste, true);
+    document.addEventListener('drop', onDrop, true);
+    document.addEventListener('keydown', onKeyDown, true);
+
+    return () => {
+      document.removeEventListener('paste', onPaste, true);
+      document.removeEventListener('drop', onDrop, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+      if (pasteTimerRef.current) clearTimeout(pasteTimerRef.current);
+    };
+  }, [session, sessionId, terminatedReason]);
 
   // Auto-save answer
   async function saveAnswer(qvId, answerPayload) {
@@ -500,6 +562,16 @@ export default function TakeExam() {
                 step="any"
                 value={answers[q.questionVersionId]?.value ?? ''}
                 onChange={(e) => handleNumericAnswer(q.questionVersionId, e.target.value)}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  triggerPasteBlockedNotice();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  triggerPasteBlockedNotice();
+                }}
                 placeholder="Enter numerical answer..."
                 className="input w-44 py-1 text-xs font-mono font-bold bg-white"
               />
@@ -604,6 +676,16 @@ export default function TakeExam() {
                         type="text"
                         value={currentVal}
                         onChange={(e) => handleBlankAnswer(q.questionVersionId, b.id, e.target.value)}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          triggerPasteBlockedNotice();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          triggerPasteBlockedNotice();
+                        }}
                         placeholder={`Type answer for ${b.placeholder || `blank ${bIdx + 1}`}...`}
                         className="input flex-1 bg-slate-50 py-1 text-xs"
                       />
@@ -621,6 +703,9 @@ export default function TakeExam() {
               <CodeMorph
                 language={q.config?.language || 'python'}
                 editable={true}
+                preventPaste={true}
+                disableCopy={true}
+                onPasteBlocked={triggerPasteBlockedNotice}
                 snippets={[
                   {
                     name: 'My Solution',
@@ -671,6 +756,16 @@ export default function TakeExam() {
                 rows={q.typeCode === 'ESSAY' ? 8 : 4}
                 value={answers[q.questionVersionId]?.text ?? ''}
                 onChange={(e) => handleTextAnswer(q.questionVersionId, e.target.value)}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  triggerPasteBlockedNotice();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  triggerPasteBlockedNotice();
+                }}
                 placeholder={q.typeCode === 'ESSAY' ? 'Write your structured essay response here...' : 'Write your answer or explanation here...'}
                 className="w-full rounded border border-slate-300 bg-slate-50/50 p-2 text-xs leading-relaxed text-slate-800 focus:bg-white focus:border-mark focus:outline-none"
               />
@@ -731,6 +826,10 @@ export default function TakeExam() {
         <p className="mt-0.5 italic text-slate-600">
           {session?.descriptionMd || 'Read each question carefully and provide your answer directly on this paper. Answers are saved automatically in real-time. Ensure you review all responses before final submission.'}
         </p>
+        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-pen border-t border-slate-200/80 pt-1">
+          <ShieldAlert size={12} className="shrink-0" />
+          <span>Anti-Cheating Policy: Pasting content into answer fields is strictly prohibited. All responses must be typed manually.</span>
+        </div>
       </div>
     );
   }
@@ -773,6 +872,14 @@ export default function TakeExam() {
 
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-100 pb-16">
+      {/* Floating Anti-Paste Prohibited Warning Alert */}
+      {pasteWarning && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border-2 border-pen bg-pen-tint/95 backdrop-blur-md px-5 py-3 text-xs sm:text-sm font-bold text-pen shadow-2xl animate-bounce">
+          <ShieldAlert size={20} className="shrink-0 text-pen" />
+          <span>Pasting is strictly prohibited during the examination. Please type your answers manually.</span>
+        </div>
+      )}
+
       {/* =========================================================================
           STICKY TOP EXAMINATION BAR (Always visible during exam)
          ========================================================================= */}
